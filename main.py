@@ -66,7 +66,7 @@ class FrameMain(wx.Frame):
         radio_control_voice = wx.MenuItem(submenu_control, wx.ID_ANY, "Voice", kind=wx.ITEM_RADIO)
         submenu_control.Append(radio_control_manual)
         submenu_control.Append(radio_control_voice)
-        item_exit = wx.MenuItem(menu_configuration, wx.ID_EXIT, "&Exit...\tCtrl+C", "Exit the application.")
+        item_exit = wx.MenuItem(menu_configuration, wx.ID_EXIT, "&Exit...\tAlt+F4", "Exit the application.")
         menu_configuration.Append(item_connect)
         menu_configuration.AppendSubMenu(submenu_control, "Control", "Change control mode.")
         menu_configuration.AppendSeparator()
@@ -93,7 +93,6 @@ class FrameMain(wx.Frame):
 
     def OnExit(self, event):
         self.Close()
-
 
 if __name__ == "__main__":
     app = wx.App()
