@@ -35,9 +35,11 @@ class FrameMain(wx.Frame):
 
         # -------------- panel cam -------------- #
         
-        self.capture = cv2.VideoCapture(0)
-        self.panel = PanelCamera(self.panel_main, self.capture)
-        self.sizer.Add(self.panel, pos=(0, 1), flag=wx.EXPAND)
+        # self.capture = cv2.VideoCapture(0)
+        # self.panel_camera = PanelCamera(self.panel_main, self.capture)
+        self.panel_camera = wx.Panel(self.panel_main)
+        self.panel_camera.SetBackgroundColour(wx.BLACK)
+        self.sizer.Add(self.panel_camera, pos=(0, 1), flag=wx.EXPAND)
 
         # ------------- bottom panel ------------- #
 

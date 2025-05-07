@@ -8,78 +8,33 @@ import numpy as np
 from OpenGL.GL import *
 from OpenGL.GL.shaders import compileShader, compileProgram
 from math import sin, cos
+from utils import read_obj
 
-class PanelView(glcanvas.GLCanvas):
-    def __init__(self, parent):
-
-        dispAttrs = glcanvas.GLAttributes()
-        dispAttrs.PlatformDefaults().Depth(16).DoubleBuffer().SampleBuffers(4).Samplers(4).EndList()
-
-        super().__init__(parent, dispAttrs, size=wx.Size(300, 300))
-
-        self.context = None
-        self.init = False
-
-        self.camera_position = glm.vec3(0.0, 0.0, 30.0)
-        self.camera_front = glm.vec3(0.0, 0.0, -1.0)
-        self.camera_up = glm.vec3(0.0, 1.0, 0.0)
+class Camera:
+    def __init__(self):
+        self.position = glm.vec3(0.0, 0.0, 30.0)
+        self.front = glm.vec3(0.0, 0.0, -1.0)
+        self.up = glm.vec3(0.0, 1.0, 0.0)
+        
         self.yaw = -90.0
         self.pitch = 0.0
         self.fov = 70.0
         self.projection = glm.perspective(glm.radians(self.fov), 500/300, 0.1, 500)
 
-        self.light_directional = {
-            "direction": [0, -1, 0],
-            "ambient": [0.3, 0.3, 0.3],
-            "diffuse": [1.0, 1.0, 1.0],
-            "specular": [1.0, 1.0, 1.0]
-        }
+class VehicleBase:
+    def __init__(self):
+
+        self.shader_program = None
+        self.vertex_count = 0
 
         self.material_data = {
-            "shininess": 32.0,
+            "shininess": 16.0,
             "ambient": [1.0, 1.0, 1.0],
-            "diffuse": [1.0, 1.0, 1.0],
-            "specular": [1.0, 1.0, 1.0]
+            "diffuse": [0.5, 0.5, 0.5],
+            "specular": [0.2, 0.2, 0.2]
         }
 
-        self.Bind(wx.EVT_ERASE_BACKGROUND, self.OnEraseBackground)
-        self.Bind(wx.EVT_SIZE, self.OnSize)
-        self.Bind(wx.EVT_PAINT, self.OnPaint)
-        self.Bind(wx.EVT_LEFT_DOWN, self.OnPrimaryDown)
-        self.Bind(wx.EVT_LEFT_UP, self.OnPrimaryUp)
-        self.Bind(wx.EVT_RIGHT_DOWN, self.OnSecondaryDown)
-        self.Bind(wx.EVT_RIGHT_UP, self.OnSecondaryUp)
-        self.Bind(wx.EVT_MOTION, self.OnMouseDrag)
-        self.Bind(wx.EVT_KEY_DOWN, self.OnKey)
-
-    def get_shaders(self):
-
-        # source_vertex = """
-        # #version 330 core
-
-        # layout (location = 0) in vec3 v_pos;
-        # layout (location = 1) in vec3 v_color;
-        # //layout (location = 2) in vec3 v_normal;
-        # out vec3 color;
-
-        # uniform mat4 model;
-        # uniform mat4 view;
-        # uniform mat4 projection;
-
-        # void main() {
-        #   gl_Position = projection * view * model * vec4(v_pos, 1.0f);
-        #   color = v_color;
-        # }
-        # """
-
-        # source_fragment = """
-        # #version 330 core
-        # in vec3 color;
-        # out vec4 FragColor;
-        # void main() {
-        #   FragColor = vec4(color.x, color.y, color.z, 1.0f);
-        # }
-        # """
+    def init_object(self) -> None:
 
         source_vertex = """
         #version 330 core
@@ -164,106 +119,240 @@ class PanelView(glcanvas.GLCanvas):
         }
         """
 
+        # ------------------------------------------------------------
+        # compilation
+        # ------------------------------------------------------------
+
         vertex_shader = compileShader(source_vertex, GL_VERTEX_SHADER)
         fragment_shader = compileShader(source_fragment, GL_FRAGMENT_SHADER)
-        return vertex_shader, fragment_shader
+        self.shader_program = compileProgram(vertex_shader, fragment_shader)
+
+        vertices, colors, normals, uvs = read_obj("objects/rocky.obj", [0.2, 0.2, 0.2])
+
+        # ----------------- vao ----------------- #
+        self.VAO = glGenVertexArrays(1)
+        glBindVertexArray(self.VAO)
+        # --------------- position --------------- #
+        vbo_position = glGenBuffers(1)
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_position)
+        glBufferData(GL_ARRAY_BUFFER, vertices.flatten(), GL_STATIC_DRAW)
+        glVertexAttribPointer(0, 3, GL_FLOAT, False, 0, ctypes.c_void_p(0)) # position
+        glEnableVertexAttribArray(0)
+        # ---------------- color ---------------- #
+        vbo_colors = glGenBuffers(1)
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_colors)
+        glBufferData(GL_ARRAY_BUFFER, colors.flatten(), GL_STATIC_DRAW)
+        glVertexAttribPointer(1, 3, GL_FLOAT, False, 0, ctypes.c_void_p(0)) # color
+        glEnableVertexAttribArray(1)
+        # --------------- normals --------------- #
+        vbo_normals = glGenBuffers(1)
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_normals)
+        glBufferData(GL_ARRAY_BUFFER, normals.flatten(), GL_STATIC_DRAW)
+        glVertexAttribPointer(2, 3, GL_FLOAT, False, 0, ctypes.c_void_p(0)) # normal
+        glEnableVertexAttribArray(2)
+
+        self.vertex_count = len(vertices)
+
+    def draw_object(self, camera: Camera, light_directional: dict) -> None:
+
+        if self.shader_program == None:
+            return
         
+        glUseProgram(self.shader_program)
+
+        model = glm.mat4(1.0)
+        view = glm.mat4(1.0)
+
+        model = glm.scale(model, glm.vec3(0.1, 0.1, 0.1))
+        model = glm.rotate(model, -glm.pi()/2, glm.vec3(1.0, 0.0, 0.0))
+        view = glm.lookAt(camera.position, camera.position + camera.front, camera.up)
+
+        loc_model = glGetUniformLocation(self.shader_program, b"model")
+        loc_view = glGetUniformLocation(self.shader_program, b"view")
+        loc_projection = glGetUniformLocation(self.shader_program, b"projection")
+
+        glUniformMatrix4fv(loc_model, 1, GL_FALSE, glm.value_ptr(model))
+        glUniformMatrix4fv(loc_view, 1, GL_FALSE, glm.value_ptr(view))
+        glUniformMatrix4fv(loc_projection, 1, GL_FALSE, glm.value_ptr(camera.projection))
+
+        # fragment uniforms
+        
+        glUniform1i(glGetUniformLocation(self.shader_program, b"bool_lighting"), 1)
+        glUniform3f(glGetUniformLocation(self.shader_program, b"view_pos"),
+                    camera.position.x,
+                    camera.position.y,
+                    camera.position.z)
+
+        glUniform3f(glGetUniformLocation(self.shader_program, b"light_directional.direction"), *light_directional["direction"])
+        glUniform3f(glGetUniformLocation(self.shader_program, b"light_directional.ambient"), *light_directional["ambient"])
+        glUniform3f(glGetUniformLocation(self.shader_program, b"light_directional.diffuse"), *light_directional["diffuse"])
+        glUniform3f(glGetUniformLocation(self.shader_program, b"light_directional.specular"), *light_directional["specular"])
+
+        glUniform1f(glGetUniformLocation(self.shader_program, b"material.shininess"), self.material_data["shininess"])
+        glUniform3f(glGetUniformLocation(self.shader_program, b"material.ambient"), *self.material_data["ambient"])
+        glUniform3f(glGetUniformLocation(self.shader_program, b"material.diffuse"), *self.material_data["diffuse"])
+        glUniform3f(glGetUniformLocation(self.shader_program, b"material.specular"), *self.material_data["specular"])
+        
+        glBindVertexArray(self.VAO)
+        glDrawArrays(GL_TRIANGLES, 0, self.vertex_count)
+
+
+class WarningPanel:
+    def __init__(self):
+
+        self.shader_program = None
+        self.vertex_count = 0
+
+    def init_object(self) -> None:
+
+        source_vertex = """
+        #version 330 core
+
+        layout (location = 0) in vec3 v_pos;
+        layout (location = 1) in vec3 v_color;
+        out vec3 color;
+ 
+        uniform mat4 model;
+        uniform mat4 view;
+        uniform mat4 projection;
+
+        void main() {
+          gl_Position = projection * view * model * vec4(v_pos, 1.0f);
+          color = v_color;
+        }
+        """
+
+        source_fragment = """
+        #version 330 core
+        in vec3 color;
+        out vec4 FragColor;
+        void main() {
+          FragColor = vec4(color.x, color.y, color.z, 0.5f);
+        }
+        """
+
+        # ------------------------------------------------------------
+        # compilation
+        # ------------------------------------------------------------
+
+        vertex_shader = compileShader(source_vertex, GL_VERTEX_SHADER)
+        fragment_shader = compileShader(source_fragment, GL_FRAGMENT_SHADER)
+        self.shader_program = compileProgram(vertex_shader, fragment_shader)
+
+        width = 15
+        height = 15
+        half_width = width / 2.0
+        half_height = height / 2.0
+        vertices = [
+            [-half_width, -half_height, 0.0],
+            [half_width, -half_height, 0.0],
+            [half_width, half_height, 0.0],
+
+            [-half_width, -half_height, 0.0],
+            [half_width, half_height, 0.0],
+            [-half_width, half_height, 0.0],
+        ]
+
+        color = [189/255, 0, 0]
+        colors = [color] * 6
+
+        vertices = np.array(vertices, dtype=np.float32)
+        colors = np.array(colors, dtype=np.float32)
+
+        # ----------------- vao ----------------- #
+        self.VAO = glGenVertexArrays(1)
+        glBindVertexArray(self.VAO)
+        # --------------- position --------------- #
+        vbo_position = glGenBuffers(1)
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_position)
+        glBufferData(GL_ARRAY_BUFFER, vertices.flatten(), GL_STATIC_DRAW)
+        glVertexAttribPointer(0, 3, GL_FLOAT, False, 0, ctypes.c_void_p(0)) # position
+        glEnableVertexAttribArray(0)
+        # ---------------- color ---------------- #
+        vbo_colors = glGenBuffers(1)
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_colors)
+        glBufferData(GL_ARRAY_BUFFER, colors.flatten(), GL_STATIC_DRAW)
+        glVertexAttribPointer(1, 3, GL_FLOAT, False, 0, ctypes.c_void_p(0)) # color
+        glEnableVertexAttribArray(1)
+
+        self.vertex_count = len(vertices)
+
+    def draw_object(self, camera: Camera) -> None:
+
+        if self.shader_program == None:
+            return
+        
+        glUseProgram(self.shader_program)
+
+        model = glm.mat4(1.0)
+        view = glm.mat4(1.0)
+        model = glm.translate(model, glm.vec3(0.0, 7.0, -20.0))
+        view = glm.lookAt(camera.position, camera.position + camera.front, camera.up)
+
+        loc_model = glGetUniformLocation(self.shader_program, b"model")
+        loc_view = glGetUniformLocation(self.shader_program, b"view")
+        loc_projection = glGetUniformLocation(self.shader_program, b"projection")
+
+        glUniformMatrix4fv(loc_model, 1, GL_FALSE, glm.value_ptr(model))
+        glUniformMatrix4fv(loc_view, 1, GL_FALSE, glm.value_ptr(view))
+        glUniformMatrix4fv(loc_projection, 1, GL_FALSE, glm.value_ptr(camera.projection))
+        
+        glBindVertexArray(self.VAO)
+        glDrawArrays(GL_TRIANGLES, 0, self.vertex_count)
+
+class PanelView(glcanvas.GLCanvas):
+    def __init__(self, parent):
+
+        dispAttrs = glcanvas.GLAttributes()
+        dispAttrs.PlatformDefaults().Depth(16).DoubleBuffer().SampleBuffers(4).Samplers(4).EndList()
+
+        super().__init__(parent, dispAttrs, size=wx.Size(300, 300))
+
+        self.context = None
+        self.init = False
+
+        self.camera = Camera()
+
+        self.light_directional = {
+            "direction": [0, -1, 0.4],
+            "ambient": [1.0, 1.0, 1.0],
+            "diffuse": [1.0, 1.0, 1.0],
+            "specular": [0.4, 0.4, 0.4]
+        }
+
+        self.Bind(wx.EVT_ERASE_BACKGROUND, self.OnEraseBackground)
+        self.Bind(wx.EVT_SIZE, self.OnSize)
+        self.Bind(wx.EVT_PAINT, self.OnPaint)
+        self.Bind(wx.EVT_LEFT_DOWN, self.OnPrimaryDown)
+        self.Bind(wx.EVT_LEFT_UP, self.OnPrimaryUp)
+        self.Bind(wx.EVT_RIGHT_DOWN, self.OnSecondaryDown)
+        self.Bind(wx.EVT_RIGHT_UP, self.OnSecondaryUp)
+        self.Bind(wx.EVT_MOTION, self.OnMouseDrag)
+        self.Bind(wx.EVT_KEY_DOWN, self.OnKey)
 
     def InitGL(self):
         if self.context is None:
             self.context = glcanvas.GLContext(self)
         self.SetCurrent(self.context)
         if not self.init:
-            glClearColor(0.0, 0.0, 0.0, 1.0)
+            glClearColor(0.0, 0.0, 0.2, 1.0)
             glClearDepth(1.0)
             glEnable(GL_DEPTH_TEST)
             glDepthMask(GL_TRUE)
             glDepthFunc(GL_LEQUAL)
             glDepthRange(0.0, 1.0)
-            # glEnable(GL_MULTISAMPLE)
-            # glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+            glEnable(GL_MULTISAMPLE)
+            glEnable(GL_BLEND)
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
 
-            vertex_shader, fragment_shader = self.get_shaders()
-            self.shader_program = compileProgram(vertex_shader, fragment_shader)
+            self.vehicle_base = VehicleBase()
+            self.vehicle_base.init_object()
 
-            self.vertices, self.colors, self.normals, self.uvs = self.read_obj("objects/rocky.obj", [0.2, 0.2, 0.2])
-
-            # ----------------- vao ----------------- #
-            self.VAO = glGenVertexArrays(1)
-            glBindVertexArray(self.VAO)
-            # --------------- position --------------- #
-            vbo_position = glGenBuffers(1)
-            glBindBuffer(GL_ARRAY_BUFFER, vbo_position)
-            glBufferData(GL_ARRAY_BUFFER, self.vertices.flatten(), GL_STATIC_DRAW)
-            glVertexAttribPointer(0, 3, GL_FLOAT, False, 0, ctypes.c_void_p(0)) # position
-            glEnableVertexAttribArray(0)
-            # ---------------- color ---------------- #
-            vbo_colors = glGenBuffers(1)
-            glBindBuffer(GL_ARRAY_BUFFER, vbo_colors)
-            glBufferData(GL_ARRAY_BUFFER, self.colors.flatten(), GL_STATIC_DRAW)
-            glVertexAttribPointer(1, 3, GL_FLOAT, False, 0, ctypes.c_void_p(0)) # color
-            glEnableVertexAttribArray(1)
-            # --------------- normals --------------- #
-            vbo_normals = glGenBuffers(1)
-            glBindBuffer(GL_ARRAY_BUFFER, vbo_normals)
-            glBufferData(GL_ARRAY_BUFFER, self.normals.flatten(), GL_STATIC_DRAW)
-            glVertexAttribPointer(2, 3, GL_FLOAT, False, 0, ctypes.c_void_p(0)) # normal
-            glEnableVertexAttribArray(2)
+            self.warning_panel1 = WarningPanel()
+            self.warning_panel1.init_object()
             
             self.init = True
-
-    def read_obj(self, filename, color=[1, 1, 1]):
-        positions = []
-        vertices = []
-        faces = []
-        normals = []
-        uvs = []
-        with open(filename) as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith('#'):
-                    continue
-                line_elements = line.split(' ')
-                # check if vertex
-                if (line_elements[0] == "v"):
-                    vertices.append([float(line_elements[1]), float(line_elements[2]), float(line_elements[3])])
-                # check if face
-                elif (line_elements[0] == "f"):
-                    face = []
-                    # get data for each vertex in the face
-                    for i in range(1, len(line_elements)):
-                        # split vertex position/uv/normal data
-                        vertex_data = line_elements[i].split('/')
-                        face.append([int(v)-1 if v else None for v in vertex_data])
-                    faces.append(face)
-                # vertex normal
-                elif (line_elements[0] == "vn"):
-                    normals.append([float(line_elements[1]), float(line_elements[2]), float(line_elements[3])])
-                # textures
-                elif (line_elements[0] == "vt"):
-                    uvs.append([float(line_elements[1]), float(line_elements[2])])
-
-        positions = []
-        normals_new = []
-        uvs_new = []
-        
-        for face in faces:
-            for vert in face:
-                positions.append(vertices[vert[0]])
-
-                if len(vert) > 1 and vert[1] is not None:
-                    uvs_new.append(uvs[vert[1]])
-                else:
-                    uvs_new.append([0.0, 0.0])
-                    
-                if len(vert) > 2 and vert[2] is not None:
-                    normals_new.append(normals[vert[2]])
-                else:
-                    normals_new.append([0.0, 1.0, 0.0]) 
-
-        colors = [color for _ in range(len(positions))]
-
-        return np.array(positions, dtype=np.float32), np.array(colors, dtype=np.float32), np.array(normals_new, dtype=np.float32), np.array(uvs_new, dtype=np.float32)
 
     def OnEraseBackground(self, event):
         pass
@@ -273,25 +362,25 @@ class PanelView(glcanvas.GLCanvas):
         if self.context:
             self.SetCurrent(self.context)
             glViewport(0, 0, size.width, size.height)
-            self.projection = glm.perspective(glm.radians(self.fov), size.width / size.height, 0.1, 500)
+            self.camera.projection = glm.perspective(glm.radians(self.camera.fov), size.width / size.height, 0.1, 500)
         event.Skip()
 
     def OnKey(self, event):
         amount = 1
-        right = glm.cross(self.camera_front, self.camera_up)
+        right = glm.cross(self.camera.front, self.camera.up)
         keycode = event.GetKeyCode()
         if keycode == wx.WXK_UP or chr(keycode).lower() == 'w':
-            self.camera_position += self.camera_front * amount
+            self.camera.position += self.camera.front * amount
         if keycode == wx.WXK_DOWN or chr(keycode).lower() == 's':
-            self.camera_position -= self.camera_front * amount
+            self.camera.position -= self.camera.front * amount
         if keycode == wx.WXK_RIGHT or chr(keycode).lower() == 'd':
-            self.camera_position += right * amount
+            self.camera.position += right * amount
         if keycode == wx.WXK_LEFT or chr(keycode).lower() == 'a':
-            self.camera_position -= right * amount
+            self.camera.position -= right * amount
         if keycode == wx.WXK_SPACE:
-            self.camera_position += self.camera_up * amount
+            self.camera.position += self.camera.up * amount
         if keycode == wx.WXK_SHIFT:
-            self.camera_position -= self.camera_up * amount
+            self.camera.position -= self.camera.up * amount
 
         self.Refresh()
         event.Skip()
@@ -337,17 +426,17 @@ class PanelView(glcanvas.GLCanvas):
             xoffset *= sensitivity
             yoffset *= sensitivity
 
-            self.yaw += xoffset
-            self.pitch -= yoffset
+            self.camera.yaw += xoffset
+            self.camera.pitch -= yoffset
 
-            self.pitch = 89 if self.pitch > 89 else self.pitch
-            self.pitch = -89 if self.pitch < -89 else self.pitch
+            self.camera.pitch = 89 if self.camera.pitch > 89 else self.camera.pitch
+            self.camera.pitch = -89 if self.camera.pitch < -89 else self.camera.pitch
 
             front = glm.vec3()
-            front.x = cos(glm.radians(self.yaw)) * cos(glm.radians(self.pitch))
-            front.y = sin(glm.radians(self.pitch))
-            front.z = sin(glm.radians(self.yaw)) * cos(glm.radians(self.pitch))
-            self.camera_front = glm.normalize(front)
+            front.x = cos(glm.radians(self.camera.yaw)) * cos(glm.radians(self.camera.pitch))
+            front.y = sin(glm.radians(self.camera.pitch))
+            front.z = sin(glm.radians(self.camera.yaw)) * cos(glm.radians(self.camera.pitch))
+            self.camera.front = glm.normalize(front)
 
             # self.GetParent().WarpPointer(center_x, center_y)
 
@@ -359,46 +448,12 @@ class PanelView(glcanvas.GLCanvas):
     def OnPaint(self, event):
         
         self.InitGL()
-        
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
-        
-        glUseProgram(self.shader_program)
 
-        model = glm.mat4(1.0)
-        view = glm.mat4(1.0)
+        glClear(GL_COLOR_BUFFER_BIT)
+        glClear(GL_DEPTH_BUFFER_BIT)
 
-        model = glm.scale(model, glm.vec3(0.1, 0.1, 0.1))
-        model = glm.rotate(model, -glm.pi()/2, glm.vec3(1.0, 0.0, 0.0))
-        view = glm.lookAt(self.camera_position, self.camera_position + self.camera_front, self.camera_up)
-
-        loc_model = glGetUniformLocation(self.shader_program, b"model")
-        loc_view = glGetUniformLocation(self.shader_program, b"view")
-        loc_projection = glGetUniformLocation(self.shader_program, b"projection")
-
-        glUniformMatrix4fv(loc_model, 1, GL_FALSE, glm.value_ptr(model))
-        glUniformMatrix4fv(loc_view, 1, GL_FALSE, glm.value_ptr(view))
-        glUniformMatrix4fv(loc_projection, 1, GL_FALSE, glm.value_ptr(self.projection))
-
-        # fragment uniforms
-        
-        glUniform1i(glGetUniformLocation(self.shader_program, b"bool_lighting"), 1)
-        glUniform3f(glGetUniformLocation(self.shader_program, b"view_pos"),
-                    self.camera_position.x,
-                    self.camera_position.y,
-                    self.camera_position.z)
-
-        glUniform3f(glGetUniformLocation(self.shader_program, b"light_directional.direction"), *self.light_directional["direction"])
-        glUniform3f(glGetUniformLocation(self.shader_program, b"light_directional.ambient"), *self.light_directional["ambient"])
-        glUniform3f(glGetUniformLocation(self.shader_program, b"light_directional.diffuse"), *self.light_directional["diffuse"])
-        glUniform3f(glGetUniformLocation(self.shader_program, b"light_directional.specular"), *self.light_directional["specular"])
-
-        glUniform1f(glGetUniformLocation(self.shader_program, b"material.shininess"), self.material_data["shininess"])
-        glUniform3f(glGetUniformLocation(self.shader_program, b"material.ambient"), *self.material_data["ambient"])
-        glUniform3f(glGetUniformLocation(self.shader_program, b"material.diffuse"), *self.material_data["diffuse"])
-        glUniform3f(glGetUniformLocation(self.shader_program, b"material.specular"), *self.material_data["specular"])
-        
-        glBindVertexArray(self.VAO)
-        glDrawArrays(GL_TRIANGLES, 0, len(self.vertices))
+        self.vehicle_base.draw_object(self.camera, self.light_directional)        
+        self.warning_panel1.draw_object(self.camera)
 
         self.SwapBuffers()
         event.Skip()
