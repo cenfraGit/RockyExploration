@@ -26,7 +26,21 @@ class PanelView(glcanvas.GLCanvas):
         self.yaw = -90.0
         self.pitch = 0.0
         self.fov = 70.0
-        self.projection = glm.perspective(glm.radians(self.fov), 300/300, 0.1, 500)
+        self.projection = glm.perspective(glm.radians(self.fov), 500/300, 0.1, 500)
+
+        self.light_directional = {
+            "direction": [0, -1, 0],
+            "ambient": [0.3, 0.3, 0.3],
+            "diffuse": [1.0, 1.0, 1.0],
+            "specular": [1.0, 1.0, 1.0]
+        }
+
+        self.material_data = {
+            "shininess": 32.0,
+            "ambient": [1.0, 1.0, 1.0],
+            "diffuse": [1.0, 1.0, 1.0],
+            "specular": [1.0, 1.0, 1.0]
+        }
 
         self.Bind(wx.EVT_ERASE_BACKGROUND, self.OnEraseBackground)
         self.Bind(wx.EVT_SIZE, self.OnSize)
@@ -36,120 +50,119 @@ class PanelView(glcanvas.GLCanvas):
         self.Bind(wx.EVT_RIGHT_DOWN, self.OnSecondaryDown)
         self.Bind(wx.EVT_RIGHT_UP, self.OnSecondaryUp)
         self.Bind(wx.EVT_MOTION, self.OnMouseDrag)
-
         self.Bind(wx.EVT_KEY_DOWN, self.OnKey)
 
     def get_shaders(self):
 
-        source_vertex = """
-        #version 330 core
-
-        layout (location = 0) in vec3 v_pos;
-        layout (location = 1) in vec3 v_color;
-        //layout (location = 2) in vec3 v_normal;
-        out vec3 color;
-
-        uniform mat4 model;
-        uniform mat4 view;
-        uniform mat4 projection;
-
-        void main() {
-          gl_Position = projection * view * model * vec4(v_pos, 1.0f);
-          color = v_color;
-        }
-        
-        """
-
-        source_fragment = """
-        #version 330 core
-        in vec3 color;
-        out vec4 FragColor;
-        void main() {
-          FragColor = vec4(color.x, color.y, color.z, 1.0f);
-        }
-        """
-
         # source_vertex = """
         # #version 330 core
-        
-        # uniform mat4 matrix_projection;
-        # uniform mat4 matrix_view;
-        # uniform mat4 matrix_model;
-        
-        # layout (location = 0) in vec3 vertex_position;
-        # layout (location = 1) in vec3 vertex_color;
-        # layout (location = 2) in vec3 vertex_normal;
-        
-        # out vec3 normal;
+
+        # layout (location = 0) in vec3 v_pos;
+        # layout (location = 1) in vec3 v_color;
+        # //layout (location = 2) in vec3 v_normal;
         # out vec3 color;
-        # out vec3 frag_pos;
-        
+
+        # uniform mat4 model;
+        # uniform mat4 view;
+        # uniform mat4 projection;
+
         # void main() {
-        #   normal = mat3(transpose(inverse(matrix_model))) * vertex_normal;
-        #   color = vertex_color;
-        #   frag_pos = vec3(matrix_model * vec4(vertex_position, 1.0));
-        #   gl_Position = matrix_projection * matrix_view * matrix_model * vec4(vertex_position, 1.0);
+        #   gl_Position = projection * view * model * vec4(v_pos, 1.0f);
+        #   color = v_color;
         # }
         # """
 
         # source_fragment = """
         # #version 330 core
-
-        # struct LightDirectional {
-        #   vec3 direction;
-        #   vec3 ambient;
-        #   vec3 diffuse;
-        #   vec3 specular;
-        # };
-
-        # struct Material {
-        #   float shininess;
-        #   vec3 ambient;
-        #   vec3 diffuse;
-        #   vec3 specular;
-        # };
-
-        # uniform bool bool_lighting;
-        # uniform vec3 view_pos;
-        
-        # uniform LightDirectional light_directional;
-        # uniform Material material;
-        
         # in vec3 color;
-        # in vec3 normal;
-        # in vec3 frag_pos;
-        # out vec4 frag_color;
-
-        # // prototypes
-        # vec3 CalcLightDir(LightDirectional light, vec3 normal, vec3 view_dir);
-        
+        # out vec4 FragColor;
         # void main() {
-        
-        #   vec3 result;
-        
-        #   if (bool_lighting) {
-        #     vec3 norm = normalize(normal);
-        #     vec3 view_dir = normalize(view_pos - frag_pos);
-        #     result = CalcLightDir(light_directional, norm, view_dir);
-        #   } else {
-        #     result = color;
-        #   }
-        #   frag_color = vec4(result, 1.0);
-        # }
-
-        # vec3 CalcLightDir(LightDirectional light, vec3 normal, vec3 view_dir) {
-        #   vec3 light_dir = normalize(-light.direction);
-        #   float diff = max(dot(normal, light_dir), 0.0);
-        #   vec3 reflect_dir = reflect(-light_dir, normal);
-        #   float spec = pow(max(dot(view_dir, reflect_dir), 0.0), material.shininess);
-
-        #   vec3 ambient = light.ambient * material.ambient;
-        #   vec3 diffuse = light.diffuse * diff * material.diffuse;
-        #   vec3 specular = light.specular * spec * material.specular;
-
-        #   return (ambient + diffuse + specular) * color;
+        #   FragColor = vec4(color.x, color.y, color.z, 1.0f);
         # }
         # """
+
+        source_vertex = """
+        #version 330 core
+        
+        uniform mat4 projection;
+        uniform mat4 view;
+        uniform mat4 model;
+        
+        layout (location = 0) in vec3 vertex_position;
+        layout (location = 1) in vec3 vertex_color;
+        layout (location = 2) in vec3 vertex_normal;
+        
+        out vec3 normal;
+        out vec3 color;
+        out vec3 frag_pos;
+        
+        void main() {
+          normal = mat3(transpose(inverse(model))) * vertex_normal;
+          color = vertex_color;
+          frag_pos = vec3(model * vec4(vertex_position, 1.0));
+          gl_Position = projection * view * model * vec4(vertex_position, 1.0);
+        }
+        """
+
+        source_fragment = """
+        #version 330 core
+
+        struct LightDirectional {
+          vec3 direction;
+          vec3 ambient;
+          vec3 diffuse;
+          vec3 specular;
+        };
+
+        struct Material {
+          float shininess;
+          vec3 ambient;
+          vec3 diffuse;
+          vec3 specular;
+        };
+
+        uniform bool bool_lighting;
+        uniform vec3 view_pos;
+        
+        uniform LightDirectional light_directional;
+        uniform Material material;
+        
+        in vec3 color;
+        in vec3 normal;
+        in vec3 frag_pos;
+        out vec4 frag_color;
+
+        // prototypes
+        vec3 CalcLightDir(LightDirectional light, vec3 normal, vec3 view_dir);
+        
+        void main() {
+        
+          vec3 result;
+        
+          if (bool_lighting) {
+            vec3 norm = normalize(normal);
+            vec3 view_dir = normalize(view_pos - frag_pos);
+            result = CalcLightDir(light_directional, norm, view_dir);
+          } else {
+            result = color;
+          }
+          frag_color = vec4(result, 1.0);
+          //frag_color = vec4(1.0, 1.0, 1.0, 1.0);
+        }
+
+        vec3 CalcLightDir(LightDirectional light, vec3 normal, vec3 view_dir) {
+          vec3 light_dir = normalize(-light.direction);
+          float diff = max(dot(normal, light_dir), 0.0);
+          vec3 reflect_dir = reflect(-light_dir, normal);
+          float spec = pow(max(dot(view_dir, reflect_dir), 0.0), material.shininess);
+
+          vec3 ambient = light.ambient * material.ambient;
+          vec3 diffuse = light.diffuse * diff * material.diffuse;
+          vec3 specular = light.specular * spec * material.specular;
+
+          return (ambient + diffuse + specular) * color;
+        }
+        """
 
         vertex_shader = compileShader(source_vertex, GL_VERTEX_SHADER)
         fragment_shader = compileShader(source_fragment, GL_FRAGMENT_SHADER)
@@ -162,18 +175,18 @@ class PanelView(glcanvas.GLCanvas):
         self.SetCurrent(self.context)
         if not self.init:
             glClearColor(0.0, 0.0, 0.0, 1.0)
-            # glClearDepth(1.0)
-            # glEnable(GL_DEPTH_TEST)
-            # glDepthMask(GL_TRUE)
-            # glDepthFunc(GL_LEQUAL)
-            # glDepthRange(0.0, 1.0)
+            glClearDepth(1.0)
+            glEnable(GL_DEPTH_TEST)
+            glDepthMask(GL_TRUE)
+            glDepthFunc(GL_LEQUAL)
+            glDepthRange(0.0, 1.0)
             # glEnable(GL_MULTISAMPLE)
-            glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+            # glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
 
             vertex_shader, fragment_shader = self.get_shaders()
             self.shader_program = compileProgram(vertex_shader, fragment_shader)
 
-            self.vertices, self.colors, self.normals, self.uvs = self.read_obj("objects/rocky.obj")
+            self.vertices, self.colors, self.normals, self.uvs = self.read_obj("objects/rocky.obj", [0.2, 0.2, 0.2])
 
             # ----------------- vao ----------------- #
             self.VAO = glGenVertexArrays(1)
@@ -191,11 +204,11 @@ class PanelView(glcanvas.GLCanvas):
             glVertexAttribPointer(1, 3, GL_FLOAT, False, 0, ctypes.c_void_p(0)) # color
             glEnableVertexAttribArray(1)
             # --------------- normals --------------- #
-            # vbo_normals = glGenBuffers(1)
-            # glBindBuffer(GL_ARRAY_BUFFER, vbo_normals)
-            # glBufferData(GL_ARRAY_BUFFER, self.normals.flatten(), GL_STATIC_DRAW)
-            # glVertexAttribPointer(2, 3, GL_FLOAT, False, 0, ctypes.c_void_p(0)) # normal
-            # glEnableVertexAttribArray(2)
+            vbo_normals = glGenBuffers(1)
+            glBindBuffer(GL_ARRAY_BUFFER, vbo_normals)
+            glBufferData(GL_ARRAY_BUFFER, self.normals.flatten(), GL_STATIC_DRAW)
+            glVertexAttribPointer(2, 3, GL_FLOAT, False, 0, ctypes.c_void_p(0)) # normal
+            glEnableVertexAttribArray(2)
             
             self.init = True
 
@@ -264,9 +277,21 @@ class PanelView(glcanvas.GLCanvas):
         event.Skip()
 
     def OnKey(self, event):
+        amount = 1
+        right = glm.cross(self.camera_front, self.camera_up)
         keycode = event.GetKeyCode()
         if keycode == wx.WXK_UP or chr(keycode).lower() == 'w':
-            self.camera_position.z += 1
+            self.camera_position += self.camera_front * amount
+        if keycode == wx.WXK_DOWN or chr(keycode).lower() == 's':
+            self.camera_position -= self.camera_front * amount
+        if keycode == wx.WXK_RIGHT or chr(keycode).lower() == 'd':
+            self.camera_position += right * amount
+        if keycode == wx.WXK_LEFT or chr(keycode).lower() == 'a':
+            self.camera_position -= right * amount
+        if keycode == wx.WXK_SPACE:
+            self.camera_position += self.camera_up * amount
+        if keycode == wx.WXK_SHIFT:
+            self.camera_position -= self.camera_up * amount
 
         self.Refresh()
         event.Skip()
@@ -292,6 +317,10 @@ class PanelView(glcanvas.GLCanvas):
         self.ReleaseMouse()
 
     def OnMouseDrag(self, event):
+        
+        center_x, center_y = self.GetClientSize().Get()
+        center_x //= 2
+        center_y //= 2
         
         # Camera rotation (primary click)
         
@@ -320,12 +349,12 @@ class PanelView(glcanvas.GLCanvas):
             front.z = sin(glm.radians(self.yaw)) * cos(glm.radians(self.pitch))
             self.camera_front = glm.normalize(front)
 
-        # Camera closer/further to origin. (secondary click)        
-        elif event.Dragging() and event.RightIsDown():
+            # self.GetParent().WarpPointer(center_x, center_y)
 
-            self.lastx, self.lasty = self.x, self.y
-            self.x, self.y = event.GetPosition()
-            self.Refresh(False)
+        # elif event.Dragging() and event.RightIsDown():
+        #     self.lastx, self.lasty = self.x, self.y
+        #     self.x, self.y = event.GetPosition()
+        #     self.Refresh(False)
 
     def OnPaint(self, event):
         
@@ -337,11 +366,9 @@ class PanelView(glcanvas.GLCanvas):
 
         model = glm.mat4(1.0)
         view = glm.mat4(1.0)
-        projection = glm.mat4(1.0)
-        
-        # model = glm.rotate(model, 1.8, glm.vec3(0.5, 1.0, 0.0))
 
-        model = glm.scale(glm.vec3(0.1, 0.1, 0.1))
+        model = glm.scale(model, glm.vec3(0.1, 0.1, 0.1))
+        model = glm.rotate(model, -glm.pi()/2, glm.vec3(1.0, 0.0, 0.0))
         view = glm.lookAt(self.camera_position, self.camera_position + self.camera_front, self.camera_up)
 
         loc_model = glGetUniformLocation(self.shader_program, b"model")
@@ -351,11 +378,27 @@ class PanelView(glcanvas.GLCanvas):
         glUniformMatrix4fv(loc_model, 1, GL_FALSE, glm.value_ptr(model))
         glUniformMatrix4fv(loc_view, 1, GL_FALSE, glm.value_ptr(view))
         glUniformMatrix4fv(loc_projection, 1, GL_FALSE, glm.value_ptr(self.projection))
+
+        # fragment uniforms
+        
+        glUniform1i(glGetUniformLocation(self.shader_program, b"bool_lighting"), 1)
+        glUniform3f(glGetUniformLocation(self.shader_program, b"view_pos"),
+                    self.camera_position.x,
+                    self.camera_position.y,
+                    self.camera_position.z)
+
+        glUniform3f(glGetUniformLocation(self.shader_program, b"light_directional.direction"), *self.light_directional["direction"])
+        glUniform3f(glGetUniformLocation(self.shader_program, b"light_directional.ambient"), *self.light_directional["ambient"])
+        glUniform3f(glGetUniformLocation(self.shader_program, b"light_directional.diffuse"), *self.light_directional["diffuse"])
+        glUniform3f(glGetUniformLocation(self.shader_program, b"light_directional.specular"), *self.light_directional["specular"])
+
+        glUniform1f(glGetUniformLocation(self.shader_program, b"material.shininess"), self.material_data["shininess"])
+        glUniform3f(glGetUniformLocation(self.shader_program, b"material.ambient"), *self.material_data["ambient"])
+        glUniform3f(glGetUniformLocation(self.shader_program, b"material.diffuse"), *self.material_data["diffuse"])
+        glUniform3f(glGetUniformLocation(self.shader_program, b"material.specular"), *self.material_data["specular"])
         
         glBindVertexArray(self.VAO)
-
-        glPointSize(10)
-        glDrawArrays(GL_TRIANGLES, 0, len(self.vertices) // 3)
+        glDrawArrays(GL_TRIANGLES, 0, len(self.vertices))
 
         self.SwapBuffers()
         event.Skip()
