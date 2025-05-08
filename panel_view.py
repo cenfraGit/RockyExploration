@@ -9,6 +9,8 @@ from OpenGL.GL import *
 from OpenGL.GL.shaders import compileShader, compileProgram
 from math import sin, cos
 from utils import read_obj
+import time
+from random import uniform
 
 class Camera:
     def __init__(self):
@@ -26,6 +28,9 @@ class VehicleBase:
 
         self.shader_program = None
         self.vertex_count = 0
+        self.model = glm.mat4(1.0)
+        self.model = glm.scale(self.model, glm.vec3(0.1, 0.1, 0.1))
+        self.model = glm.rotate(self.model, -glm.pi()/2, glm.vec3(1.0, 0.0, 0.0))
 
         self.material_data = {
             "shininess": 16.0,
@@ -159,19 +164,14 @@ class VehicleBase:
             return
         
         glUseProgram(self.shader_program)
-
-        model = glm.mat4(1.0)
-        view = glm.mat4(1.0)
-
-        model = glm.scale(model, glm.vec3(0.1, 0.1, 0.1))
-        model = glm.rotate(model, -glm.pi()/2, glm.vec3(1.0, 0.0, 0.0))
+        
         view = glm.lookAt(camera.position, camera.position + camera.front, camera.up)
 
         loc_model = glGetUniformLocation(self.shader_program, b"model")
         loc_view = glGetUniformLocation(self.shader_program, b"view")
         loc_projection = glGetUniformLocation(self.shader_program, b"projection")
 
-        glUniformMatrix4fv(loc_model, 1, GL_FALSE, glm.value_ptr(model))
+        glUniformMatrix4fv(loc_model, 1, GL_FALSE, glm.value_ptr(self.model))
         glUniformMatrix4fv(loc_view, 1, GL_FALSE, glm.value_ptr(view))
         glUniformMatrix4fv(loc_projection, 1, GL_FALSE, glm.value_ptr(camera.projection))
 
@@ -198,10 +198,13 @@ class VehicleBase:
 
 
 class WarningPanel:
-    def __init__(self):
+    def __init__(self, width=15, height=15):
 
         self.shader_program = None
         self.vertex_count = 0
+        self.width = width
+        self.height = height
+        self.model = glm.mat4(1.0)
 
     def init_object(self) -> None:
 
@@ -239,10 +242,8 @@ class WarningPanel:
         fragment_shader = compileShader(source_fragment, GL_FRAGMENT_SHADER)
         self.shader_program = compileProgram(vertex_shader, fragment_shader)
 
-        width = 15
-        height = 15
-        half_width = width / 2.0
-        half_height = height / 2.0
+        half_width = self.width / 2.0
+        half_height = self.height / 2.0
         vertices = [
             [-half_width, -half_height, 0.0],
             [half_width, -half_height, 0.0],
@@ -284,21 +285,107 @@ class WarningPanel:
         
         glUseProgram(self.shader_program)
 
-        model = glm.mat4(1.0)
         view = glm.mat4(1.0)
-        model = glm.translate(model, glm.vec3(0.0, 7.0, -20.0))
         view = glm.lookAt(camera.position, camera.position + camera.front, camera.up)
 
         loc_model = glGetUniformLocation(self.shader_program, b"model")
         loc_view = glGetUniformLocation(self.shader_program, b"view")
         loc_projection = glGetUniformLocation(self.shader_program, b"projection")
 
-        glUniformMatrix4fv(loc_model, 1, GL_FALSE, glm.value_ptr(model))
+        glUniformMatrix4fv(loc_model, 1, GL_FALSE, glm.value_ptr(self.model))
         glUniformMatrix4fv(loc_view, 1, GL_FALSE, glm.value_ptr(view))
         glUniformMatrix4fv(loc_projection, 1, GL_FALSE, glm.value_ptr(camera.projection))
         
         glBindVertexArray(self.VAO)
         glDrawArrays(GL_TRIANGLES, 0, self.vertex_count)
+
+
+class PathTracer:
+    def __init__(self):
+        self.shader_program = None
+        self.vertex_count = 0
+        self.model = glm.mat4(1.0)
+        self.path_points = []
+        self.VBO_position = None
+
+    def add_position(self, new_position):
+        self.path_points.append(list(new_position))
+        # if len(self.path_points) > 1000:
+        #     self.path_points.pop(0)
+
+    def init_object(self) -> None:
+
+        source_vertex = """
+        #version 330 core
+
+        layout (location = 0) in vec3 v_pos;
+ 
+        uniform mat4 model;
+        uniform mat4 view;
+        uniform mat4 projection;
+
+        void main() {
+          gl_Position = projection * view * model * vec4(v_pos, 1.0f);
+        }
+        """
+
+        source_fragment = """
+        #version 330 core
+        out vec4 FragColor;
+        void main() {
+          FragColor = vec4(58.0/255, 134.0/255.0, 183.0/255.0, 1.0f);
+        }
+        """
+
+        # ------------------------------------------------------------
+        # compilation
+        # ------------------------------------------------------------
+
+        vertex_shader = compileShader(source_vertex, GL_VERTEX_SHADER)
+        fragment_shader = compileShader(source_fragment, GL_FRAGMENT_SHADER)
+        self.shader_program = compileProgram(vertex_shader, fragment_shader)
+
+        self.VAO = glGenVertexArrays(1)
+        glBindVertexArray(self.VAO)
+
+        self.VBO_position = glGenBuffers(1)
+        glBindBuffer(GL_ARRAY_BUFFER, self.VBO_position)
+        self.vertex_capacity = 1000
+        glBufferData(GL_ARRAY_BUFFER, self.vertex_capacity * 3 * 4, None, GL_DYNAMIC_DRAW)
+        glVertexAttribPointer(0, 3, GL_FLOAT, False, 0, ctypes.c_void_p(0))
+        glEnableVertexAttribArray(0)
+
+    def draw_object(self, camera: Camera) -> None:
+
+        if self.shader_program == None:
+            return
+
+        glUseProgram(self.shader_program)
+
+        vertex_count = len(self.path_points)
+        if vertex_count > self.vertex_capacity:
+            self.vertex_capacity = vertex_count * 2
+            glBindBuffer(GL_ARRAY_BUFFER, self.VBO_position)
+            glBufferData(GL_ARRAY_BUFFER, self.vertex_capacity * 3 * 4, None, GL_DYNAMIC_DRAW)
+        flat_vertices = np.array(self.path_points, dtype=np.float32).flatten()
+        glBindBuffer(GL_ARRAY_BUFFER, self.VBO_position)
+        glBufferSubData(GL_ARRAY_BUFFER, 0, flat_vertices.nbytes, flat_vertices)
+
+        view = glm.lookAt(camera.position, camera.position + camera.front, camera.up)
+
+        loc_model = glGetUniformLocation(self.shader_program, b"model")
+        loc_view = glGetUniformLocation(self.shader_program, b"view")
+        loc_projection = glGetUniformLocation(self.shader_program, b"projection")
+
+        glUniformMatrix4fv(loc_model, 1, GL_FALSE, glm.value_ptr(self.model))
+        glUniformMatrix4fv(loc_view, 1, GL_FALSE, glm.value_ptr(view))
+        glUniformMatrix4fv(loc_projection, 1, GL_FALSE, glm.value_ptr(camera.projection))
+        
+        glBindVertexArray(self.VAO)
+        glPointSize(10)
+        glLineWidth(4)
+        # glDrawArrays(GL_POINTS, 0, len(self.path_points))
+        glDrawArrays(GL_LINE_STRIP, 0, len(self.path_points))
 
 class PanelView(glcanvas.GLCanvas):
     def __init__(self, parent):
@@ -309,6 +396,7 @@ class PanelView(glcanvas.GLCanvas):
         super().__init__(parent, dispAttrs, size=wx.Size(300, 300))
 
         self.context = None
+        self.timer = wx.Timer()
         self.init = False
 
         self.camera = Camera()
@@ -329,6 +417,14 @@ class PanelView(glcanvas.GLCanvas):
         self.Bind(wx.EVT_RIGHT_UP, self.OnSecondaryUp)
         self.Bind(wx.EVT_MOTION, self.OnMouseDrag)
         self.Bind(wx.EVT_KEY_DOWN, self.OnKey)
+        self.timer.Bind(wx.EVT_TIMER, self.OnTimer)
+
+        self.timer.Start(30)
+
+        self.frame_count = 0
+        self.start_time = time.time()
+        self.fps = 0
+        self.delta_time = 0.0
 
     def InitGL(self):
         if self.context is None:
@@ -349,8 +445,26 @@ class PanelView(glcanvas.GLCanvas):
             self.vehicle_base = VehicleBase()
             self.vehicle_base.init_object()
 
-            self.warning_panel1 = WarningPanel()
-            self.warning_panel1.init_object()
+            self.path_tracer = PathTracer()
+            self.path_tracer.init_object()
+
+            self.warning_panel_north = WarningPanel()
+            self.warning_panel_north.model = glm.translate(self.warning_panel_north.model, glm.vec3(0.0, 7.0, -20.0))
+            self.warning_panel_north.init_object()
+
+            self.warning_panel_south = WarningPanel()
+            self.warning_panel_south.model = glm.translate(self.warning_panel_south.model, glm.vec3(0.0, 7.0, 20.0))
+            self.warning_panel_south.init_object()
+
+            self.warning_panel_east = WarningPanel(width=20)
+            self.warning_panel_east.model = glm.translate(self.warning_panel_east.model, glm.vec3(18.0, 7.0, 0.0))
+            self.warning_panel_east.model = glm.rotate(self.warning_panel_east.model, -glm.pi()/2, glm.vec3(0.0, 1.0, 0.0))
+            self.warning_panel_east.init_object()
+
+            self.warning_panel_west = WarningPanel(width=20)
+            self.warning_panel_west.model = glm.translate(self.warning_panel_west.model, glm.vec3(-18.0, 7.0, 0.0))
+            self.warning_panel_west.model = glm.rotate(self.warning_panel_west.model, -glm.pi()/2, glm.vec3(0.0, 1.0, 0.0))
+            self.warning_panel_west.init_object()
             
             self.init = True
 
@@ -438,7 +552,7 @@ class PanelView(glcanvas.GLCanvas):
             front.z = sin(glm.radians(self.camera.yaw)) * cos(glm.radians(self.camera.pitch))
             self.camera.front = glm.normalize(front)
 
-            # self.GetParent().WarpPointer(center_x, center_y)
+            self.GetParent().WarpPointer(center_x, center_y)
 
         # elif event.Dragging() and event.RightIsDown():
         #     self.lastx, self.lasty = self.x, self.y
@@ -452,9 +566,22 @@ class PanelView(glcanvas.GLCanvas):
         glClear(GL_COLOR_BUFFER_BIT)
         glClear(GL_DEPTH_BUFFER_BIT)
 
-        self.vehicle_base.draw_object(self.camera, self.light_directional)        
-        self.warning_panel1.draw_object(self.camera)
+        vehicle_position = glm.vec3(self.vehicle_base.model[3][0],
+                                    self.vehicle_base.model[3][1],
+                                    self.vehicle_base.model[3][2])
+        self.path_tracer.add_position(vehicle_position)
+
+        self.vehicle_base.draw_object(self.camera, self.light_directional)
+        # self.path_tracer.draw_object(self.camera)
+        self.warning_panel_north.draw_object(self.camera)
+        self.warning_panel_south.draw_object(self.camera)
+        self.warning_panel_east.draw_object(self.camera)
+        self.warning_panel_west.draw_object(self.camera)
 
         self.SwapBuffers()
         event.Skip()
-        
+
+    def OnTimer(self, event:wx.TimerEvent):
+        # self.vehicle_base.model = glm.translate(self.vehicle_base.model, glm.vec3(uniform(-5, 2), uniform(-2, 5), uniform(-0.5, 0.5)))
+        self.Refresh(False)
+        event.Skip()

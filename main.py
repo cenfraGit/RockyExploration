@@ -35,24 +35,24 @@ class FrameMain(wx.Frame):
 
         # -------------- panel cam -------------- #
         
-        # self.capture = cv2.VideoCapture(0)
-        # self.panel_camera = PanelCamera(self.panel_main, self.capture)
-        self.panel_camera = wx.Panel(self.panel_main)
-        self.panel_camera.SetBackgroundColour(wx.BLACK)
-        self.sizer.Add(self.panel_camera, pos=(0, 1), flag=wx.EXPAND)
+        # # self.capture = cv2.VideoCapture(0)
+        # # self.panel_camera = PanelCamera(self.panel_main, self.capture)
+        # self.panel_camera = wx.Panel(self.panel_main)
+        # self.panel_camera.SetBackgroundColour(wx.BLACK)
+        # self.sizer.Add(self.panel_camera, pos=(0, 1), flag=wx.EXPAND)
 
         # ------------- bottom panel ------------- #
 
-        self.panel_bottom = wx.Panel(self.panel_main)
-        self.panel_bottom.SetBackgroundColour(wx.RED)
-        self.sizer.Add(self.panel_bottom, pos=(1, 0), span=(1, 2), flag=wx.EXPAND)
+        # self.panel_bottom = wx.Panel(self.panel_main)
+        # self.panel_bottom.SetBackgroundColour(wx.RED)
+        # self.sizer.Add(self.panel_bottom, pos=(1, 0), span=(1, 2), flag=wx.EXPAND)
 
         # ----------- sizer growables ----------- #
         
         self.sizer.AddGrowableCol(0, 1)
-        self.sizer.AddGrowableCol(1, 1)
+        # self.sizer.AddGrowableCol(1, 1)
         self.sizer.AddGrowableRow(0, 1)
-        self.sizer.AddGrowableRow(1, 1)
+        # self.sizer.AddGrowableRow(1, 1)
         self.sizer.Layout()
 
         # ------------------------------------------------------------
