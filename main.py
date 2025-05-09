@@ -1,10 +1,9 @@
 # main.py
 
 import wx
-import cv2
 from utils import dip
-from panel_camera import PanelCamera
-from panel_view import PanelView
+from camera import FrameCamera
+from view import PanelView
 
 import ctypes
 ctypes.windll.shcore.SetProcessDpiAwareness(1)
@@ -19,7 +18,7 @@ class FrameMain(wx.Frame):
 
         # ------------- frame setup ------------- #
         
-        self.SetTitle("Rocky")
+        self.SetTitle("Rocky UI")
         self.SetClientSize(dip(800, 500))
 
         # all subpanels will be children of the main panel
@@ -33,26 +32,10 @@ class FrameMain(wx.Frame):
         self.panel_view.SetBackgroundColour(wx.GREEN)
         self.sizer.Add(self.panel_view, pos=(0, 0), flag=wx.EXPAND)
 
-        # -------------- panel cam -------------- #
-        
-        # # self.capture = cv2.VideoCapture(0)
-        # # self.panel_camera = PanelCamera(self.panel_main, self.capture)
-        # self.panel_camera = wx.Panel(self.panel_main)
-        # self.panel_camera.SetBackgroundColour(wx.BLACK)
-        # self.sizer.Add(self.panel_camera, pos=(0, 1), flag=wx.EXPAND)
-
-        # ------------- bottom panel ------------- #
-
-        # self.panel_bottom = wx.Panel(self.panel_main)
-        # self.panel_bottom.SetBackgroundColour(wx.RED)
-        # self.sizer.Add(self.panel_bottom, pos=(1, 0), span=(1, 2), flag=wx.EXPAND)
-
         # ----------- sizer growables ----------- #
         
         self.sizer.AddGrowableCol(0, 1)
-        # self.sizer.AddGrowableCol(1, 1)
         self.sizer.AddGrowableRow(0, 1)
-        # self.sizer.AddGrowableRow(1, 1)
         self.sizer.Layout()
 
         # ------------------------------------------------------------
@@ -60,6 +43,9 @@ class FrameMain(wx.Frame):
         # ------------------------------------------------------------
 
         menubar = wx.MenuBar()
+        
+        # ------------ configuration ------------ #
+        
         menu_configuration = wx.Menu()
         item_connect = wx.MenuItem(menu_configuration, -1, "&Connect...\tCtrl+C", "Connect to Rocky.")
         # submenu for control mode
@@ -70,20 +56,39 @@ class FrameMain(wx.Frame):
         submenu_control.Append(radio_control_voice)
         item_exit = wx.MenuItem(menu_configuration, wx.ID_EXIT, "&Exit...\tAlt+F4", "Exit the application.")
         menu_configuration.Append(item_connect)
-        menu_configuration.AppendSubMenu(submenu_control, "Control", "Change control mode.")
+        menu_configuration.AppendSubMenu(submenu_control, "Control Mode", "Change Rocky's control mode.")
         menu_configuration.AppendSeparator()
         menu_configuration.Append(item_exit)
 
+        self.Bind(wx.EVT_MENU, self.OnExit, item_exit)
+
+        # ----------------- view ----------------- #
+
+        menu_view = wx.Menu()
+        item_camera_footage = wx.MenuItem(menu_view, -1, "Show camera footage...", "Show Rocky's camera footage in an external window.")
+        item_controls = wx.MenuItem(menu_view, -1, "Show controls...", "Show the control panel for the current control mode.")
+        
+        menu_view.Append(item_camera_footage)
+        menu_view.Append(item_controls)
+
+        self.Bind(wx.EVT_MENU, self.OnCamera, item_camera_footage)
+        self.Bind(wx.EVT_MENU, self.OnControls, item_controls)
+
+        # ----------------- help ----------------- #
+        
         menu_help = wx.Menu()
         item_log = wx.MenuItem(menu_help, -1, "&Log...\tCtrl+T", "See log.")
         menu_help.Append(item_log)
 
+        self.Bind(wx.EVT_MENU, self.OnLog, item_log)
+
+        # ------------ setup menubar ------------ #
+
         menubar.Append(menu_configuration, "Configuration")
+        menubar.Append(menu_view, "View")
         menubar.Append(menu_help, "Help")
         
         self.SetMenuBar(menubar)
-
-        self.Bind(wx.EVT_MENU, self.OnExit, item_exit)
 
         # -------------- statusbar -------------- #
 
@@ -96,9 +101,18 @@ class FrameMain(wx.Frame):
     def OnExit(self, event):
         self.Close()
 
+    def OnCamera(self, event):
+        frame = FrameCamera(self)
+        frame.Show()
+
+    def OnControls(self, event):
+        pass
+
+    def OnLog(self, event):
+        pass
+
 if __name__ == "__main__":
     app = wx.App()
     instance = FrameMain(None)
     instance.Show()
     app.MainLoop()
-

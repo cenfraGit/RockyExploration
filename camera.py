@@ -1,6 +1,20 @@
+# camera.py
+
 import wx
 import cv2
 import numpy as np
+from utils import dip
+
+class FrameCamera(wx.Frame):
+    def __init__(self, parent):
+        super().__init__(parent)
+
+        self.SetTitle("Camera")
+        self.SetClientSize(dip(300, 300))
+
+        self.capture = cv2.VideoCapture(0)
+        self.panel_camera = PanelCamera(self, self.capture)
+        self.panel_camera.SetBackgroundColour(wx.BLACK)
 
 class PanelCamera(wx.Panel):
     def __init__(self, parent, capture, fps=30):

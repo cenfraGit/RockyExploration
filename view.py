@@ -1,4 +1,4 @@
-# panel_view.py
+# view.py
 
 import wx
 import glm
@@ -20,8 +20,8 @@ class Camera:
         
         self.yaw = -90.0
         self.pitch = 0.0
-        self.fov = 70.0
-        self.projection = glm.perspective(glm.radians(self.fov), 500/300, 0.1, 500)
+        self.fov = 80.0
+        self.projection = glm.perspective(glm.radians(self.fov), 500/300, 0.1, 1000)
 
 class VehicleBase:
     def __init__(self):
@@ -132,7 +132,33 @@ class VehicleBase:
         fragment_shader = compileShader(source_fragment, GL_FRAGMENT_SHADER)
         self.shader_program = compileProgram(vertex_shader, fragment_shader)
 
-        vertices, colors, normals, uvs = read_obj("objects/rocky.obj", [0.2, 0.2, 0.2])
+        source_vertex = """
+        #version 330 core
+
+        layout (location = 0) in vec3 v_pos;
+ 
+        uniform mat4 model;
+        uniform mat4 view;
+        uniform mat4 projection;
+
+        void main() {
+          gl_Position = projection * view * model * vec4(v_pos, 1.0f);
+        }
+        """
+
+        source_fragment = """
+        #version 330 core
+        out vec4 FragColor;
+        void main() {
+          FragColor = vec4(90/255.0,121/255.0,200/255.0, 1.0f); // 0.6 red only // 90/255.0, 121/255.0, 200/255.0
+        }
+        """
+
+        vertex_shader_wire = compileShader(source_vertex, GL_VERTEX_SHADER)
+        fragment_shader_wire = compileShader(source_fragment, GL_FRAGMENT_SHADER)
+        self.shader_program_wire = compileProgram(vertex_shader_wire, fragment_shader_wire)
+
+        vertices, colors, normals, uvs = read_obj("objects/rocky.obj", [0.1, 0.1, 0.1])
 
         # ----------------- vao ----------------- #
         self.VAO = glGenVertexArrays(1)
@@ -162,11 +188,29 @@ class VehicleBase:
 
         if self.shader_program == None:
             return
+
+        view = glm.lookAt(camera.position, camera.position + camera.front, camera.up)
+
+        glUseProgram(self.shader_program_wire)
+        
+        loc_model = glGetUniformLocation(self.shader_program_wire, b"model")
+        loc_view = glGetUniformLocation(self.shader_program_wire, b"view")
+        loc_projection = glGetUniformLocation(self.shader_program_wire, b"projection")
+        glUniformMatrix4fv(loc_model, 1, GL_FALSE, glm.value_ptr(self.model))
+        glUniformMatrix4fv(loc_view, 1, GL_FALSE, glm.value_ptr(view))
+        glUniformMatrix4fv(loc_projection, 1, GL_FALSE, glm.value_ptr(camera.projection))
+
+        glBindVertexArray(self.VAO)
+        glCullFace(GL_FRONT)
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+        glLineWidth(4)
+        glDrawArrays(GL_TRIANGLES, 0, self.vertex_count)
+        
+        glCullFace(GL_BACK)
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
         
         glUseProgram(self.shader_program)
         
-        view = glm.lookAt(camera.position, camera.position + camera.front, camera.up)
-
         loc_model = glGetUniformLocation(self.shader_program, b"model")
         loc_view = glGetUniformLocation(self.shader_program, b"view")
         loc_projection = glGetUniformLocation(self.shader_program, b"projection")
@@ -384,7 +428,6 @@ class PathTracer:
         glBindVertexArray(self.VAO)
         glPointSize(10)
         glLineWidth(4)
-        # glDrawArrays(GL_POINTS, 0, len(self.path_points))
         glDrawArrays(GL_LINE_STRIP, 0, len(self.path_points))
 
 class PanelView(glcanvas.GLCanvas):
@@ -400,6 +443,7 @@ class PanelView(glcanvas.GLCanvas):
         self.init = False
 
         self.camera = Camera()
+        self.pressed_keys = []
 
         self.light_directional = {
             "direction": [0, -1, 0.4],
@@ -413,13 +457,12 @@ class PanelView(glcanvas.GLCanvas):
         self.Bind(wx.EVT_PAINT, self.OnPaint)
         self.Bind(wx.EVT_LEFT_DOWN, self.OnPrimaryDown)
         self.Bind(wx.EVT_LEFT_UP, self.OnPrimaryUp)
-        self.Bind(wx.EVT_RIGHT_DOWN, self.OnSecondaryDown)
-        self.Bind(wx.EVT_RIGHT_UP, self.OnSecondaryUp)
-        self.Bind(wx.EVT_MOTION, self.OnMouseDrag)
-        self.Bind(wx.EVT_KEY_DOWN, self.OnKey)
+        self.Bind(wx.EVT_MOTION, self.OnMotion)
+        self.Bind(wx.EVT_KEY_DOWN, self.OnKeyDown)
+        self.Bind(wx.EVT_KEY_UP, self.OnKeyUp)
         self.timer.Bind(wx.EVT_TIMER, self.OnTimer)
 
-        self.timer.Start(30)
+        self.timer.Start(16)
 
         self.frame_count = 0
         self.start_time = time.time()
@@ -431,7 +474,8 @@ class PanelView(glcanvas.GLCanvas):
             self.context = glcanvas.GLContext(self)
         self.SetCurrent(self.context)
         if not self.init:
-            glClearColor(0.0, 0.0, 0.2, 1.0)
+            glClearColor(0.0, 0.0, 0.3, 1.0)
+            # glClearColor(0.8, 0.8, 0.8, 1.0)
             glClearDepth(1.0)
             glEnable(GL_DEPTH_TEST)
             glDepthMask(GL_TRUE)
@@ -440,7 +484,6 @@ class PanelView(glcanvas.GLCanvas):
             glEnable(GL_MULTISAMPLE)
             glEnable(GL_BLEND)
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
-            glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
 
             self.vehicle_base = VehicleBase()
             self.vehicle_base.init_object()
@@ -479,59 +522,31 @@ class PanelView(glcanvas.GLCanvas):
             self.camera.projection = glm.perspective(glm.radians(self.camera.fov), size.width / size.height, 0.1, 500)
         event.Skip()
 
-    def OnKey(self, event):
-        amount = 1
-        right = glm.cross(self.camera.front, self.camera.up)
+    def OnKeyDown(self, event):
         keycode = event.GetKeyCode()
-        if keycode == wx.WXK_UP or chr(keycode).lower() == 'w':
-            self.camera.position += self.camera.front * amount
-        if keycode == wx.WXK_DOWN or chr(keycode).lower() == 's':
-            self.camera.position -= self.camera.front * amount
-        if keycode == wx.WXK_RIGHT or chr(keycode).lower() == 'd':
-            self.camera.position += right * amount
-        if keycode == wx.WXK_LEFT or chr(keycode).lower() == 'a':
-            self.camera.position -= right * amount
-        if keycode == wx.WXK_SPACE:
-            self.camera.position += self.camera.up * amount
-        if keycode == wx.WXK_SHIFT:
-            self.camera.position -= self.camera.up * amount
-
-        self.Refresh()
+        if keycode not in self.pressed_keys:
+            self.pressed_keys.append(keycode)
         event.Skip()
 
+    def OnKeyUp(self, event):
+        keycode = event.GetKeyCode()
+        if keycode in self.pressed_keys:
+            self.pressed_keys.remove(keycode)
+
     def OnPrimaryDown(self, event):
-        try:
-            self.CaptureMouse()
-        except:
-            pass
+        self.CaptureMouse()
+        self.SetCursor(wx.Cursor(wx.CURSOR_CROSS))
         self.x, self.y = self.lastx, self.lasty = event.GetPosition()
 
     def OnPrimaryUp(self, event):
-        self.ReleaseMouse()
+        if self.HasCapture():
+            self.ReleaseMouse()
+            self.SetCursor(wx.Cursor(wx.CURSOR_ARROW))
 
-    def OnSecondaryDown(self, event):
-        try:
-            self.CaptureMouse()
-        except:
-            pass
-        self.x, self.y = self.lastx, self.lasty = event.GetPosition()
-
-    def OnSecondaryUp(self, event):
-        self.ReleaseMouse()
-
-    def OnMouseDrag(self, event):
-        
-        center_x, center_y = self.GetClientSize().Get()
-        center_x //= 2
-        center_y //= 2
-        
-        # Camera rotation (primary click)
-        
+    def OnMotion(self, event):
         if event.Dragging() and event.LeftIsDown():
-            
             self.lastx, self.lasty = self.x, self.y
             self.x, self.y = event.GetPosition()
-            self.Refresh(False)
 
             xoffset = self.x - self.lastx
             yoffset = self.y - self.lasty
@@ -546,19 +561,6 @@ class PanelView(glcanvas.GLCanvas):
             self.camera.pitch = 89 if self.camera.pitch > 89 else self.camera.pitch
             self.camera.pitch = -89 if self.camera.pitch < -89 else self.camera.pitch
 
-            front = glm.vec3()
-            front.x = cos(glm.radians(self.camera.yaw)) * cos(glm.radians(self.camera.pitch))
-            front.y = sin(glm.radians(self.camera.pitch))
-            front.z = sin(glm.radians(self.camera.yaw)) * cos(glm.radians(self.camera.pitch))
-            self.camera.front = glm.normalize(front)
-
-            self.GetParent().WarpPointer(center_x, center_y)
-
-        # elif event.Dragging() and event.RightIsDown():
-        #     self.lastx, self.lasty = self.x, self.y
-        #     self.x, self.y = event.GetPosition()
-        #     self.Refresh(False)
-
     def OnPaint(self, event):
         
         self.InitGL()
@@ -566,13 +568,15 @@ class PanelView(glcanvas.GLCanvas):
         glClear(GL_COLOR_BUFFER_BIT)
         glClear(GL_DEPTH_BUFFER_BIT)
 
+        self.process_input()
+
         vehicle_position = glm.vec3(self.vehicle_base.model[3][0],
                                     self.vehicle_base.model[3][1],
                                     self.vehicle_base.model[3][2])
         self.path_tracer.add_position(vehicle_position)
 
         self.vehicle_base.draw_object(self.camera, self.light_directional)
-        # self.path_tracer.draw_object(self.camera)
+        self.path_tracer.draw_object(self.camera)
         self.warning_panel_north.draw_object(self.camera)
         self.warning_panel_south.draw_object(self.camera)
         self.warning_panel_east.draw_object(self.camera)
@@ -581,7 +585,37 @@ class PanelView(glcanvas.GLCanvas):
         self.SwapBuffers()
         event.Skip()
 
+    def process_input(self):
+        amount_movement = 20 * self.delta_time
+        right = glm.cross(self.camera.front, self.camera.up)
+        for keycode in self.pressed_keys:
+            if keycode == wx.WXK_UP or chr(keycode).lower() == 'w':
+                self.camera.position += self.camera.front * amount_movement
+            if keycode == wx.WXK_DOWN or chr(keycode).lower() == 's':
+                self.camera.position -= self.camera.front * amount_movement
+            if keycode == wx.WXK_RIGHT or chr(keycode).lower() == 'd':
+                self.camera.position += right * amount_movement
+            if keycode == wx.WXK_LEFT or chr(keycode).lower() == 'a':
+                self.camera.position -= right * amount_movement
+            if keycode == wx.WXK_SPACE:
+                self.camera.position += self.camera.up * amount_movement
+            if keycode == wx.WXK_SHIFT:
+                self.camera.position -= self.camera.up * amount_movement
+
+        front = glm.vec3()
+        front.x = cos(glm.radians(self.camera.yaw)) * cos(glm.radians(self.camera.pitch))
+        front.y = sin(glm.radians(self.camera.pitch))
+        front.z = sin(glm.radians(self.camera.yaw)) * cos(glm.radians(self.camera.pitch))
+        self.camera.front = glm.normalize(front)
+        
     def OnTimer(self, event:wx.TimerEvent):
-        # self.vehicle_base.model = glm.translate(self.vehicle_base.model, glm.vec3(uniform(-5, 2), uniform(-2, 5), uniform(-0.5, 0.5)))
+        current_time = time.time()
+        elapsed_time = current_time - self.start_time
+        self.delta_time = elapsed_time
+        self.start_time = current_time
+        self.vehicle_base.model = glm.translate(self.vehicle_base.model,
+                                                glm.vec3(uniform(-5, 2),
+                                                         uniform(-2, 5),
+                                                         uniform(-0.5, 0.5)))
         self.Refresh(False)
         event.Skip()
