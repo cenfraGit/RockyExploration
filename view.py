@@ -21,7 +21,7 @@ class Camera:
         self.yaw = -90.0
         self.pitch = 0.0
         self.fov = 80.0
-        self.projection = glm.perspective(glm.radians(self.fov), 500/300, 0.1, 1000)
+        self.projection = glm.perspective(glm.radians(self.fov), 500/300, 0.1, 10000)
 
 class VehicleBase:
     def __init__(self):
@@ -29,8 +29,8 @@ class VehicleBase:
         self.shader_program = None
         self.vertex_count = 0
         self.model = glm.mat4(1.0)
-        self.model = glm.scale(self.model, glm.vec3(0.1, 0.1, 0.1))
-        self.model = glm.rotate(self.model, -glm.pi()/2, glm.vec3(1.0, 0.0, 0.0))
+        # self.model = glm.scale(self.model, glm.vec3(0.1, 0.1, 0.1))
+        # self.model = glm.rotate(self.model, -glm.pi()/2, glm.vec3(1.0, 0.0, 0.0))
 
         self.material_data = {
             "shininess": 16.0,
@@ -184,6 +184,11 @@ class VehicleBase:
 
         self.vertex_count = len(vertices)
 
+    def get_position(self) -> glm.vec3:
+        return glm.vec3(self.model[3][0],
+                        self.model[3][1],
+                        self.model[3][2])
+
     def draw_object(self, camera: Camera, light_directional: dict) -> None:
 
         if self.shader_program == None:
@@ -240,15 +245,13 @@ class VehicleBase:
         glBindVertexArray(self.VAO)
         glDrawArrays(GL_TRIANGLES, 0, self.vertex_count)
 
-
 class WarningPanel:
-    def __init__(self, width=15, height=15):
+    def __init__(self, width=140, height=140):
 
         self.shader_program = None
         self.vertex_count = 0
         self.width = width
         self.height = height
-        self.model = glm.mat4(1.0)
 
     def init_object(self) -> None:
 
@@ -322,12 +325,31 @@ class WarningPanel:
 
         self.vertex_count = len(vertices)
 
-    def draw_object(self, camera: Camera) -> None:
+    def draw_object(self, camera: Camera, vehicle_base: VehicleBase, side:str, show:bool) -> None:
 
         if self.shader_program == None:
             return
+
+        if not show:
+            return
         
         glUseProgram(self.shader_program)
+
+        model = vehicle_base.model
+
+        offset_north_south = 190
+        offset_east_west = 170
+        
+        if side == "north":
+            model = glm.translate(model, glm.vec3(0.0, 7.0, -offset_north_south))
+        elif side == "south":
+            model = glm.translate(model, glm.vec3(0.0, 7.0, offset_north_south))
+        elif side == "east":
+            model = glm.translate(model, glm.vec3(offset_east_west, 7.0, 0.0))
+            model = glm.rotate(model, -glm.pi()/2, glm.vec3(0.0, 1.0, 0.0))
+        elif side == "west":
+            model = glm.translate(model, glm.vec3(-offset_east_west, 7.0, 0.0))
+            model = glm.rotate(model, -glm.pi()/2, glm.vec3(0.0, 1.0, 0.0))
 
         view = glm.mat4(1.0)
         view = glm.lookAt(camera.position, camera.position + camera.front, camera.up)
@@ -336,7 +358,7 @@ class WarningPanel:
         loc_view = glGetUniformLocation(self.shader_program, b"view")
         loc_projection = glGetUniformLocation(self.shader_program, b"projection")
 
-        glUniformMatrix4fv(loc_model, 1, GL_FALSE, glm.value_ptr(self.model))
+        glUniformMatrix4fv(loc_model, 1, GL_FALSE, glm.value_ptr(model))
         glUniformMatrix4fv(loc_view, 1, GL_FALSE, glm.value_ptr(view))
         glUniformMatrix4fv(loc_projection, 1, GL_FALSE, glm.value_ptr(camera.projection))
         
@@ -492,21 +514,15 @@ class PanelView(glcanvas.GLCanvas):
             self.path_tracer.init_object()
 
             self.warning_panel_north = WarningPanel()
-            self.warning_panel_north.model = glm.translate(self.warning_panel_north.model, glm.vec3(0.0, 7.0, -20.0))
             self.warning_panel_north.init_object()
 
             self.warning_panel_south = WarningPanel()
-            self.warning_panel_south.model = glm.translate(self.warning_panel_south.model, glm.vec3(0.0, 7.0, 20.0))
             self.warning_panel_south.init_object()
 
-            self.warning_panel_east = WarningPanel(width=20)
-            self.warning_panel_east.model = glm.translate(self.warning_panel_east.model, glm.vec3(18.0, 7.0, 0.0))
-            self.warning_panel_east.model = glm.rotate(self.warning_panel_east.model, -glm.pi()/2, glm.vec3(0.0, 1.0, 0.0))
+            self.warning_panel_east = WarningPanel(width=200)
             self.warning_panel_east.init_object()
 
-            self.warning_panel_west = WarningPanel(width=20)
-            self.warning_panel_west.model = glm.translate(self.warning_panel_west.model, glm.vec3(-18.0, 7.0, 0.0))
-            self.warning_panel_west.model = glm.rotate(self.warning_panel_west.model, -glm.pi()/2, glm.vec3(0.0, 1.0, 0.0))
+            self.warning_panel_west = WarningPanel(width=200)
             self.warning_panel_west.init_object()
             
             self.init = True
@@ -551,7 +567,7 @@ class PanelView(glcanvas.GLCanvas):
             xoffset = self.x - self.lastx
             yoffset = self.y - self.lasty
             
-            sensitivity = 0.1
+            sensitivity = 0.4
             xoffset *= sensitivity
             yoffset *= sensitivity
 
@@ -570,24 +586,22 @@ class PanelView(glcanvas.GLCanvas):
 
         self.process_input()
 
-        vehicle_position = glm.vec3(self.vehicle_base.model[3][0],
-                                    self.vehicle_base.model[3][1],
-                                    self.vehicle_base.model[3][2])
-        self.path_tracer.add_position(vehicle_position)
+        self.path_tracer.add_position(self.vehicle_base.get_position())
 
         self.vehicle_base.draw_object(self.camera, self.light_directional)
         self.path_tracer.draw_object(self.camera)
-        self.warning_panel_north.draw_object(self.camera)
-        self.warning_panel_south.draw_object(self.camera)
-        self.warning_panel_east.draw_object(self.camera)
-        self.warning_panel_west.draw_object(self.camera)
+        self.warning_panel_north.draw_object(self.camera, self.vehicle_base, "north", True)
+        self.warning_panel_south.draw_object(self.camera, self.vehicle_base, "south", True)
+        self.warning_panel_east.draw_object(self.camera, self.vehicle_base, "east", True)
+        self.warning_panel_west.draw_object(self.camera, self.vehicle_base, "west", True)
 
         self.SwapBuffers()
         event.Skip()
 
     def process_input(self):
-        amount_movement = 20 * self.delta_time
+        amount_movement = 300 * self.delta_time
         right = glm.cross(self.camera.front, self.camera.up)
+        right = glm.normalize(right)
         for keycode in self.pressed_keys:
             if keycode == wx.WXK_UP or chr(keycode).lower() == 'w':
                 self.camera.position += self.camera.front * amount_movement
@@ -615,7 +629,8 @@ class PanelView(glcanvas.GLCanvas):
         self.start_time = current_time
         self.vehicle_base.model = glm.translate(self.vehicle_base.model,
                                                 glm.vec3(uniform(-5, 2),
-                                                         uniform(-2, 5),
-                                                         uniform(-0.5, 0.5)))
+                                                         uniform(-0.5, 0.5),
+                                                         uniform(-2, 5)))
+        self.vehicle_base.model = glm.rotate(self.vehicle_base.model, 0.01, glm.vec3(0.0, 1.0, 0.0))
         self.Refresh(False)
         event.Skip()
