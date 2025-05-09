@@ -29,8 +29,6 @@ class VehicleBase:
         self.shader_program = None
         self.vertex_count = 0
         self.model = glm.mat4(1.0)
-        # self.model = glm.scale(self.model, glm.vec3(0.1, 0.1, 0.1))
-        # self.model = glm.rotate(self.model, -glm.pi()/2, glm.vec3(1.0, 0.0, 0.0))
 
         self.material_data = {
             "shininess": 16.0,
@@ -206,11 +204,12 @@ class VehicleBase:
         glUniformMatrix4fv(loc_projection, 1, GL_FALSE, glm.value_ptr(camera.projection))
 
         glBindVertexArray(self.VAO)
+
         glCullFace(GL_FRONT)
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
         glLineWidth(4)
         glDrawArrays(GL_TRIANGLES, 0, self.vertex_count)
-        
+
         glCullFace(GL_BACK)
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
         

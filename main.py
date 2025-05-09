@@ -4,6 +4,7 @@ import wx
 from utils import dip
 from camera import FrameCamera
 from view import PanelView
+from controls import FrameControlsVoice
 
 import ctypes
 ctypes.windll.shcore.SetProcessDpiAwareness(1)
@@ -38,6 +39,8 @@ class FrameMain(wx.Frame):
         self.sizer.AddGrowableRow(0, 1)
         self.sizer.Layout()
 
+        self.controls_mode = "manual"
+
         # ------------------------------------------------------------
         # menubar
         # ------------------------------------------------------------
@@ -61,6 +64,8 @@ class FrameMain(wx.Frame):
         menu_configuration.Append(item_exit)
 
         self.Bind(wx.EVT_MENU, self.OnExit, item_exit)
+        self.Bind(wx.EVT_MENU, self.OnMenubarControlsManual, radio_control_manual)
+        self.Bind(wx.EVT_MENU, self.OnMenubarControlsVoice, radio_control_voice)
 
         # ----------------- view ----------------- #
 
@@ -105,8 +110,18 @@ class FrameMain(wx.Frame):
         frame = FrameCamera(self)
         frame.Show()
 
+    def OnMenubarControlsManual(self, event):
+        self.controls_mode = "manual"
+
+    def OnMenubarControlsVoice(self, event):
+        self.controls_mode = "voice"
+
     def OnControls(self, event):
-        pass
+        if self.controls_mode == "manual":
+            pass
+        if self.controls_mode == "voice":
+            frame = FrameControlsVoice(self)
+            frame.Show()
 
     def OnLog(self, event):
         pass
