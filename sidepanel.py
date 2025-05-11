@@ -40,7 +40,7 @@ class SidePanel(wx.Panel):
         self.SetSTServerIP("10.01.10.10")
 
         # add to main sizer
-        self.sizer.Add(sb_status, proportion=0, flag=wx.EXPAND)
+        self.sizer.Add(sb_status, proportion=0, flag=wx.EXPAND|wx.LEFT|wx.TOP|wx.RIGHT, border=dip(5))
 
         # ------------------------------------------------------------
         # vehicle data
@@ -67,11 +67,28 @@ class SidePanel(wx.Panel):
         self.SetSTAcceleration("0.0 m/s^2")
 
         # add to main sizer
-        self.sizer.Add(sb_vehicledata, proportion=0, flag=wx.EXPAND)
+        self.sizer.Add(sb_vehicledata, proportion=0, flag=wx.EXPAND|wx.LEFT|wx.TOP|wx.RIGHT, border=dip(5))
 
         # ------------------------------------------------------------
         # voice control
         # ------------------------------------------------------------
+
+        # create staticbox
+        sb_voicecontrol = wx.StaticBox(self, label="Voice Control")
+        sb_voicecontrol_sizer = wx.GridBagSizer(dip(3), dip(3))
+        sb_voicecontrol.SetSizer(sb_voicecontrol_sizer)
+
+        # modifiable statictexts
+        self.test = wx.TextCtrl(sb_voicecontrol)
+        button_talk = wx.Button(sb_voicecontrol, label="Talk to Rocky...")
+        
+        # add to staticbox sizer
+        sb_voicecontrol_sizer.Add(self.test, pos=(0, 0), flag=wx.EXPAND|wx.TOP, border=dip(15))
+        sb_voicecontrol_sizer.Add(button_talk, pos=(1, 0), flag=wx.EXPAND|wx.BOTTOM, border=dip(15))
+        sb_voicecontrol_sizer.AddGrowableCol(0, 1)
+
+        # add to main sizer
+        self.sizer.Add(sb_voicecontrol, proportion=0, flag=wx.EXPAND|wx.LEFT|wx.TOP|wx.RIGHT, border=dip(5))
 
         # ------------------------------------------------------------
         # log
@@ -89,10 +106,10 @@ class SidePanel(wx.Panel):
         sb_log_sizer.Add(self.textctrl_log, flag=wx.EXPAND|wx.ALL, border=dip(3))
 
         # add to main sizer
-        self.sizer.Add(sb_log, proportion=0, flag=wx.EXPAND)
+        self.sizer.Add(sb_log, proportion=0, flag=wx.EXPAND|wx.LEFT|wx.TOP|wx.RIGHT, border=dip(5))
 
 
-        
+
         self.sizer.Layout()
 
     def SetSTStatus(self, value:bool):

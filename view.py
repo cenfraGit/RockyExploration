@@ -22,8 +22,8 @@ class Camera:
         self.pitch = 0.0
         self.fov = 80.0
         self.near = 0.1
-        self.far = 10000
-        self.projection = glm.perspective(glm.radians(self.fov), 500/300, self.near, self.far)
+        self.far = 100000
+        self.projection = glm.perspective(glm.radians(self.fov), 1, self.near, self.far)
 
 class VehicleBase:
     def __init__(self):
@@ -33,10 +33,10 @@ class VehicleBase:
         self.model = glm.mat4(1.0)
 
         self.material_data = {
-            "shininess": 16.0,
-            "ambient": [1.0, 1.0, 1.0],
-            "diffuse": [0.5, 0.5, 0.5],
-            "specular": [0.4, 0.4, 0.4]
+            "shininess": 64.0,
+            "ambient": [0.2, 0.2, 0.2],
+            "diffuse": [0.2, 0.2, 0.2],
+            "specular": [0.5, 0.5, 0.5]
         }
 
     def init_object(self) -> None:
@@ -149,7 +149,8 @@ class VehicleBase:
         #version 330 core
         out vec4 FragColor;
         void main() {
-          FragColor = vec4(90/255.0,121/255.0,200/255.0, 1.0f); // 0.6 red only // 90/255.0, 121/255.0, 200/255.0
+          //FragColor = vec4(90/255.0,121/255.0,200/255.0, 1.0f); // 0.6 red only // 90/255.0, 121/255.0, 200/255.0
+          FragColor = vec4(0.4f, 0.4f, 0.4f, 1.0f);
         }
         """
 
@@ -157,7 +158,7 @@ class VehicleBase:
         fragment_shader_wire = compileShader(source_fragment, GL_FRAGMENT_SHADER)
         self.shader_program_wire = compileProgram(vertex_shader_wire, fragment_shader_wire)
 
-        vertices, colors, normals, uvs = read_obj("objects/rocky.obj", [0.1, 0.1, 0.1])
+        vertices, colors, normals, uvs = read_obj("objects/rocky.obj", [1.0, 1.0, 1.0])
 
         # ----------------- vao ----------------- #
         self.VAO = glGenVertexArrays(1)
@@ -181,6 +182,9 @@ class VehicleBase:
         glVertexAttribPointer(2, 3, GL_FLOAT, False, 0, ctypes.c_void_p(0)) # normal
         glEnableVertexAttribArray(2)
 
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+        glBindVertexArray(0)
+
         self.vertex_count = len(vertices)
 
     def get_position(self) -> glm.vec3:
@@ -192,25 +196,28 @@ class VehicleBase:
 
         if self.shader_program == None:
             return
+        
+        glBindVertexArray(self.VAO)
 
         view = glm.lookAt(camera.position, camera.position + camera.front, camera.up)
 
-        glUseProgram(self.shader_program_wire)
+        # ----------- draw in wireframe ----------- #
         
+
+        glUseProgram(self.shader_program_wire)
         loc_model = glGetUniformLocation(self.shader_program_wire, b"model")
         loc_view = glGetUniformLocation(self.shader_program_wire, b"view")
         loc_projection = glGetUniformLocation(self.shader_program_wire, b"projection")
         glUniformMatrix4fv(loc_model, 1, GL_FALSE, glm.value_ptr(self.model))
         glUniformMatrix4fv(loc_view, 1, GL_FALSE, glm.value_ptr(view))
         glUniformMatrix4fv(loc_projection, 1, GL_FALSE, glm.value_ptr(camera.projection))
-
-        glBindVertexArray(self.VAO)
-
-        glLineWidth(4)
+        glLineWidth(2)
         glEnable(GL_CULL_FACE)
         glCullFace(GL_FRONT)
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
         glDrawArrays(GL_TRIANGLES, 0, self.vertex_count)
+
+        # ----------- redraw as solid ----------- #
 
         glUseProgram(self.shader_program)
         
@@ -372,9 +379,12 @@ class PathTracer:
         self.vertex_count = 0
         self.model = glm.mat4(1.0)
         self.path_points = []
+        self.max_points = 2000
         self.VBO_position = None
 
     def add_position(self, new_position):
+        if len(self.path_points) > self.max_points - 1: # use queue
+            self.path_points.pop(0)
         self.path_points.append(list(new_position))
 
     def init_object(self) -> None:
@@ -397,7 +407,8 @@ class PathTracer:
         #version 330 core
         out vec4 FragColor;
         void main() {
-          FragColor = vec4(58.0/255, 134.0/255.0, 183.0/255.0, 1.0f);
+          //FragColor = vec4(58.0/255, 134.0/255.0, 183.0/255.0, 0.7f);
+          FragColor = vec4(0.0f, 0.0f, 0.2f, 0.6f);
         }
         """
 
@@ -414,10 +425,12 @@ class PathTracer:
 
         self.VBO_position = glGenBuffers(1)
         glBindBuffer(GL_ARRAY_BUFFER, self.VBO_position)
-        self.vertex_capacity = 1000
-        glBufferData(GL_ARRAY_BUFFER, self.vertex_capacity * 3 * 4, None, GL_DYNAMIC_DRAW)
+        glBufferData(GL_ARRAY_BUFFER, self.max_points * 3 * 4, None, GL_DYNAMIC_DRAW)
         glVertexAttribPointer(0, 3, GL_FLOAT, False, 0, ctypes.c_void_p(0))
         glEnableVertexAttribArray(0)
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+        glBindVertexArray(0)
 
     def draw_object(self, camera: Camera) -> None:
 
@@ -426,14 +439,9 @@ class PathTracer:
 
         glUseProgram(self.shader_program)
 
-        vertex_count = len(self.path_points)
-        if vertex_count > self.vertex_capacity:
-            self.vertex_capacity = vertex_count * 2
-            glBindBuffer(GL_ARRAY_BUFFER, self.VBO_position)
-            glBufferData(GL_ARRAY_BUFFER, self.vertex_capacity * 3 * 4, None, GL_DYNAMIC_DRAW)
-        flat_vertices = np.array(self.path_points, dtype=np.float32).flatten()
+        vertices = np.array(self.path_points, dtype=np.float32).flatten()
         glBindBuffer(GL_ARRAY_BUFFER, self.VBO_position)
-        glBufferSubData(GL_ARRAY_BUFFER, 0, flat_vertices.nbytes, flat_vertices)
+        glBufferSubData(GL_ARRAY_BUFFER, 0, vertices.nbytes, vertices)
 
         view = glm.lookAt(camera.position, camera.position + camera.front, camera.up)
 
@@ -446,8 +454,7 @@ class PathTracer:
         glUniformMatrix4fv(loc_projection, 1, GL_FALSE, glm.value_ptr(camera.projection))
         
         glBindVertexArray(self.VAO)
-        glPointSize(10)
-        glLineWidth(2)
+        glLineWidth(3)
         glDrawArrays(GL_LINE_STRIP, 0, len(self.path_points))
 
 class SkySphere:
@@ -510,6 +517,9 @@ class SkySphere:
         glVertexAttribPointer(1, 3, GL_FLOAT, False, 0, ctypes.c_void_p(0)) # color
         glEnableVertexAttribArray(1)
 
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+        glBindVertexArray(0)
+
         self.vertex_count = len(vertices)
 
     def draw_object(self, camera: Camera, show:bool=True) -> None:
@@ -540,13 +550,15 @@ class SkySphere:
         
         glBindVertexArray(self.VAO)
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+        glLineWidth(4)
         glDrawArrays(GL_TRIANGLES, 0, self.vertex_count)
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
 
 class PanelView(glcanvas.GLCanvas):
     def __init__(self, parent):
 
         dispAttrs = glcanvas.GLAttributes()
-        dispAttrs.PlatformDefaults().Depth(16).DoubleBuffer().SampleBuffers(4).Samplers(4).EndList()
+        dispAttrs.PlatformDefaults().Depth(16).DoubleBuffer().EndList() # SampleBuffers(4).Samplers(4)
 
         super().__init__(parent, dispAttrs, size=wx.Size(300, 300))
 
@@ -558,10 +570,10 @@ class PanelView(glcanvas.GLCanvas):
         self.pressed_keys = []
 
         self.light_directional = {
-            "direction": [0, -1, 0.4],
-            "ambient": [1.0, 1.0, 1.0],
-            "diffuse": [1.0, 1.0, 1.0],
-            "specular": [0.4, 0.4, 0.4]
+            "direction": [0.0, -1, 0.0],
+            "ambient": [0.2, 0.2, 0.2],
+            "diffuse": [0.7, 0.7, 0.7],
+            "specular": [1.0, 1.0, 1.0]
         }
 
         self.Bind(wx.EVT_ERASE_BACKGROUND, self.OnEraseBackground)
@@ -576,9 +588,7 @@ class PanelView(glcanvas.GLCanvas):
 
         self.timer.Start(5)
 
-        #self.frame_count = 0
         self.start_time = time.time()
-        #self.fps = 0
         self.delta_time = 0.0
 
     def InitGL(self):
@@ -587,14 +597,13 @@ class PanelView(glcanvas.GLCanvas):
         self.SetCurrent(self.context)
         if not self.init:
             glClearColor(0.8, 0.8, 0.8, 1.0)
-            glClearDepth(1.0)
             glEnable(GL_DEPTH_TEST)
-            glEnable(GL_MULTISAMPLE)
             glEnable(GL_BLEND)
-            glDepthMask(GL_TRUE)
-            glDepthFunc(GL_LEQUAL)
-            glDepthRange(0.0, 1.0)
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+            #glClearDepth(1.0)
+            #glDepthMask(GL_TRUE)
+            #glDepthFunc(GL_LESS)
+            #glDepthRange(0.0, 1.0)
 
             self.sky_sphere = SkySphere()
             self.sky_sphere.init_object()
@@ -677,8 +686,7 @@ class PanelView(glcanvas.GLCanvas):
         
         self.InitGL()
 
-        glClear(GL_COLOR_BUFFER_BIT)
-        glClear(GL_DEPTH_BUFFER_BIT)
+        glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
 
         self.process_input()
 
@@ -729,5 +737,6 @@ class PanelView(glcanvas.GLCanvas):
                                                          uniform(-0.5, 0.5),
                                                          uniform(-2, 5)))
         self.vehicle_base.model = glm.rotate(self.vehicle_base.model, 0.01, glm.vec3(0.0, 1.0, 0.0))
+        self.vehicle_base.model = glm.rotate(self.vehicle_base.model, 0.007, glm.vec3(0.5, 0.5, 0.5))
         self.Refresh(False)
         event.Skip()

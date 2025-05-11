@@ -20,7 +20,7 @@ class FrameMain(wx.Frame):
 
         # ------------- frame setup ------------- #
         
-        self.SetTitle("Rocky UI")
+        self.SetTitle("Rocky Exploration UI - v1.0")
         self.SetClientSize(dip(800, 500))
 
         # all subpanels will be children of the main panel
@@ -105,10 +105,7 @@ class FrameMain(wx.Frame):
         # -------------- statusbar -------------- #
 
         self.statusbar = self.CreateStatusBar()
-        self.SetStatus("Offline")
-
-    def SetStatus(self, text):
-        self.statusbar.SetStatusText(f"Status: {text}")
+        self.statusbar.SetStatusText("Welcome to RE v1.0")
 
     def OnExit(self, event):
         self.Close()
