@@ -627,7 +627,7 @@ class PanelView(glcanvas.GLCanvas):
         if self.context:
             self.SetCurrent(self.context)
             glViewport(0, 0, size.width, size.height)
-            self.camera.projection = glm.perspective(glm.radians(self.camera.fov), size.width / size.height, self.near, self.far)
+            self.camera.projection = glm.perspective(glm.radians(self.camera.fov), size.width / size.height, self.camera.near, self.camera.far)
         event.Skip()
 
     def OnKeyDown(self, event):

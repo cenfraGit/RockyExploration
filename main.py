@@ -5,6 +5,7 @@ from utils import dip
 from camera import FrameCamera
 from view import PanelView
 from controls import FrameControlsVoice
+from sidepanel import SidePanel
 
 import ctypes
 ctypes.windll.shcore.SetProcessDpiAwareness(1)
@@ -35,7 +36,7 @@ class FrameMain(wx.Frame):
 
         # ----------- panel info ----------- #
         
-        self.panel_info = wx.Panel(self.panel_main)
+        self.panel_info = SidePanel(self.panel_main)
         self.sizer.Add(self.panel_info, pos=(0, 1), flag=wx.EXPAND)
 
         # ----------- sizer growables ----------- #
