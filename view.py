@@ -21,7 +21,9 @@ class Camera:
         self.yaw = -90.0
         self.pitch = 0.0
         self.fov = 80.0
-        self.projection = glm.perspective(glm.radians(self.fov), 500/300, 0.1, 10000)
+        self.near = 0.1
+        self.far = 10000
+        self.projection = glm.perspective(glm.radians(self.fov), 500/300, self.near, self.far)
 
 class VehicleBase:
     def __init__(self):
@@ -34,7 +36,7 @@ class VehicleBase:
             "shininess": 16.0,
             "ambient": [1.0, 1.0, 1.0],
             "diffuse": [0.5, 0.5, 0.5],
-            "specular": [0.2, 0.2, 0.2]
+            "specular": [0.4, 0.4, 0.4]
         }
 
     def init_object(self) -> None:
@@ -105,7 +107,6 @@ class VehicleBase:
             result = color;
           }
           frag_color = vec4(result, 1.0);
-          //frag_color = vec4(1.0, 1.0, 1.0, 1.0);
         }
 
         vec3 CalcLightDir(LightDirectional light, vec3 normal, vec3 view_dir) {
@@ -205,14 +206,12 @@ class VehicleBase:
 
         glBindVertexArray(self.VAO)
 
+        glLineWidth(4)
+        glEnable(GL_CULL_FACE)
         glCullFace(GL_FRONT)
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
-        glLineWidth(4)
         glDrawArrays(GL_TRIANGLES, 0, self.vertex_count)
 
-        glCullFace(GL_BACK)
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
-        
         glUseProgram(self.shader_program)
         
         loc_model = glGetUniformLocation(self.shader_program, b"model")
@@ -242,6 +241,9 @@ class VehicleBase:
         glUniform3f(glGetUniformLocation(self.shader_program, b"material.specular"), *self.material_data["specular"])
         
         glBindVertexArray(self.VAO)
+        glDisable(GL_CULL_FACE)
+        glCullFace(GL_BACK)
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
         glDrawArrays(GL_TRIANGLES, 0, self.vertex_count)
 
 class WarningPanel:
@@ -364,7 +366,6 @@ class WarningPanel:
         glBindVertexArray(self.VAO)
         glDrawArrays(GL_TRIANGLES, 0, self.vertex_count)
 
-
 class PathTracer:
     def __init__(self):
         self.shader_program = None
@@ -375,8 +376,6 @@ class PathTracer:
 
     def add_position(self, new_position):
         self.path_points.append(list(new_position))
-        # if len(self.path_points) > 1000:
-        #     self.path_points.pop(0)
 
     def init_object(self) -> None:
 
@@ -448,8 +447,100 @@ class PathTracer:
         
         glBindVertexArray(self.VAO)
         glPointSize(10)
-        glLineWidth(4)
+        glLineWidth(2)
         glDrawArrays(GL_LINE_STRIP, 0, len(self.path_points))
+
+class SkySphere:
+    def __init__(self):
+
+        self.shader_program = None
+        self.vertex_count = 0
+
+    def init_object(self) -> None:
+
+        source_vertex = """
+        #version 330 core
+
+        layout (location = 0) in vec3 v_pos;
+        layout (location = 1) in vec3 v_color;
+        out vec3 color;
+ 
+        uniform mat4 model;
+        uniform mat4 view;
+        uniform mat4 projection;
+
+        void main() {
+          gl_Position = projection * view * model * vec4(v_pos, 1.0f);
+          color = v_color;
+        }
+        """
+
+        source_fragment = """
+        #version 330 core
+        in vec3 color;
+        out vec4 FragColor;
+        void main() {
+          FragColor = vec4(color.x, color.y, color.z, 0.5f);
+        }
+        """
+
+        # ------------------------------------------------------------
+        # compilation
+        # ------------------------------------------------------------
+
+        vertex_shader = compileShader(source_vertex, GL_VERTEX_SHADER)
+        fragment_shader = compileShader(source_fragment, GL_FRAGMENT_SHADER)
+        self.shader_program = compileProgram(vertex_shader, fragment_shader)
+
+        vertices, colors, normals, uvs = read_obj("objects/sphere.obj", [0.7, 0.7, 0.7])
+
+        # ----------------- vao ----------------- #
+        self.VAO = glGenVertexArrays(1)
+        glBindVertexArray(self.VAO)
+        # --------------- position --------------- #
+        vbo_position = glGenBuffers(1)
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_position)
+        glBufferData(GL_ARRAY_BUFFER, vertices.flatten(), GL_STATIC_DRAW)
+        glVertexAttribPointer(0, 3, GL_FLOAT, False, 0, ctypes.c_void_p(0)) # position
+        glEnableVertexAttribArray(0)
+        # ---------------- color ---------------- #
+        vbo_colors = glGenBuffers(1)
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_colors)
+        glBufferData(GL_ARRAY_BUFFER, colors.flatten(), GL_STATIC_DRAW)
+        glVertexAttribPointer(1, 3, GL_FLOAT, False, 0, ctypes.c_void_p(0)) # color
+        glEnableVertexAttribArray(1)
+
+        self.vertex_count = len(vertices)
+
+    def draw_object(self, camera: Camera, show:bool=True) -> None:
+
+        if not show:
+            return
+        
+        glUseProgram(self.shader_program)
+
+        model = glm.mat4(1.0)
+        # set position to be the same as camera
+        model[3][0] = camera.position.x
+        model[3][1] = camera.position.y
+        model[3][2] = camera.position.z
+
+        scale = 1000.0
+        model = glm.scale(model, glm.vec3(scale, scale, scale))
+        view = glm.mat4(1.0)
+        view = glm.lookAt(camera.position, camera.position + camera.front, camera.up)
+
+        loc_model = glGetUniformLocation(self.shader_program, b"model")
+        loc_view = glGetUniformLocation(self.shader_program, b"view")
+        loc_projection = glGetUniformLocation(self.shader_program, b"projection")
+
+        glUniformMatrix4fv(loc_model, 1, GL_FALSE, glm.value_ptr(model))
+        glUniformMatrix4fv(loc_view, 1, GL_FALSE, glm.value_ptr(view))
+        glUniformMatrix4fv(loc_projection, 1, GL_FALSE, glm.value_ptr(camera.projection))
+        
+        glBindVertexArray(self.VAO)
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+        glDrawArrays(GL_TRIANGLES, 0, self.vertex_count)
 
 class PanelView(glcanvas.GLCanvas):
     def __init__(self, parent):
@@ -483,11 +574,11 @@ class PanelView(glcanvas.GLCanvas):
         self.Bind(wx.EVT_KEY_UP, self.OnKeyUp)
         self.timer.Bind(wx.EVT_TIMER, self.OnTimer)
 
-        self.timer.Start(16)
+        self.timer.Start(5)
 
-        self.frame_count = 0
+        #self.frame_count = 0
         self.start_time = time.time()
-        self.fps = 0
+        #self.fps = 0
         self.delta_time = 0.0
 
     def InitGL(self):
@@ -495,16 +586,18 @@ class PanelView(glcanvas.GLCanvas):
             self.context = glcanvas.GLContext(self)
         self.SetCurrent(self.context)
         if not self.init:
-            glClearColor(0.0, 0.0, 0.3, 1.0)
-            # glClearColor(0.8, 0.8, 0.8, 1.0)
+            glClearColor(0.8, 0.8, 0.8, 1.0)
             glClearDepth(1.0)
             glEnable(GL_DEPTH_TEST)
+            glEnable(GL_MULTISAMPLE)
+            glEnable(GL_BLEND)
             glDepthMask(GL_TRUE)
             glDepthFunc(GL_LEQUAL)
             glDepthRange(0.0, 1.0)
-            glEnable(GL_MULTISAMPLE)
-            glEnable(GL_BLEND)
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
+
+            self.sky_sphere = SkySphere()
+            self.sky_sphere.init_object()
 
             self.vehicle_base = VehicleBase()
             self.vehicle_base.init_object()
@@ -534,7 +627,7 @@ class PanelView(glcanvas.GLCanvas):
         if self.context:
             self.SetCurrent(self.context)
             glViewport(0, 0, size.width, size.height)
-            self.camera.projection = glm.perspective(glm.radians(self.camera.fov), size.width / size.height, 0.1, 500)
+            self.camera.projection = glm.perspective(glm.radians(self.camera.fov), size.width / size.height, self.near, self.far)
         event.Skip()
 
     def OnKeyDown(self, event):
@@ -547,16 +640,19 @@ class PanelView(glcanvas.GLCanvas):
         keycode = event.GetKeyCode()
         if keycode in self.pressed_keys:
             self.pressed_keys.remove(keycode)
+        event.Skip()
 
     def OnPrimaryDown(self, event):
         self.CaptureMouse()
         self.SetCursor(wx.Cursor(wx.CURSOR_CROSS))
         self.x, self.y = self.lastx, self.lasty = event.GetPosition()
+        event.Skip()
 
     def OnPrimaryUp(self, event):
         if self.HasCapture():
             self.ReleaseMouse()
             self.SetCursor(wx.Cursor(wx.CURSOR_ARROW))
+        event.Skip()
 
     def OnMotion(self, event):
         if event.Dragging() and event.LeftIsDown():
@@ -575,6 +671,7 @@ class PanelView(glcanvas.GLCanvas):
 
             self.camera.pitch = 89 if self.camera.pitch > 89 else self.camera.pitch
             self.camera.pitch = -89 if self.camera.pitch < -89 else self.camera.pitch
+        event.Skip()
 
     def OnPaint(self, event):
         
@@ -587,6 +684,7 @@ class PanelView(glcanvas.GLCanvas):
 
         self.path_tracer.add_position(self.vehicle_base.get_position())
 
+        self.sky_sphere.draw_object(self.camera)
         self.vehicle_base.draw_object(self.camera, self.light_directional)
         self.path_tracer.draw_object(self.camera)
         self.warning_panel_north.draw_object(self.camera, self.vehicle_base, "north", True)
@@ -599,13 +697,13 @@ class PanelView(glcanvas.GLCanvas):
 
     def process_input(self):
         amount_movement = 300 * self.delta_time
-        right = glm.cross(self.camera.front, self.camera.up)
-        right = glm.normalize(right)
+        right = glm.normalize(glm.cross(self.camera.front, self.camera.up))
+        front = glm.normalize(glm.cross(right, self.camera.up))
         for keycode in self.pressed_keys:
             if keycode == wx.WXK_UP or chr(keycode).lower() == 'w':
-                self.camera.position += self.camera.front * amount_movement
+                self.camera.position -= front * amount_movement
             if keycode == wx.WXK_DOWN or chr(keycode).lower() == 's':
-                self.camera.position -= self.camera.front * amount_movement
+                self.camera.position += front * amount_movement
             if keycode == wx.WXK_RIGHT or chr(keycode).lower() == 'd':
                 self.camera.position += right * amount_movement
             if keycode == wx.WXK_LEFT or chr(keycode).lower() == 'a':

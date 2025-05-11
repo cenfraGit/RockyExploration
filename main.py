@@ -33,9 +33,15 @@ class FrameMain(wx.Frame):
         self.panel_view.SetBackgroundColour(wx.GREEN)
         self.sizer.Add(self.panel_view, pos=(0, 0), flag=wx.EXPAND)
 
+        # ----------- panel info ----------- #
+        
+        self.panel_info = wx.Panel(self.panel_main)
+        self.sizer.Add(self.panel_info, pos=(0, 1), flag=wx.EXPAND)
+
         # ----------- sizer growables ----------- #
         
-        self.sizer.AddGrowableCol(0, 1)
+        self.sizer.AddGrowableCol(0, 3)
+        self.sizer.AddGrowableCol(1, 1)
         self.sizer.AddGrowableRow(0, 1)
         self.sizer.Layout()
 
