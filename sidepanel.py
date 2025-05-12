@@ -2,6 +2,7 @@
 
 import wx
 from utils import dip
+import datetime
 
 class SidePanel(wx.Panel):
     def __init__(self, parent):
@@ -99,7 +100,8 @@ class SidePanel(wx.Panel):
         sb_log_sizer = wx.BoxSizer(wx.VERTICAL)
         sb_log.SetSizer(sb_log_sizer)
 
-        self.textctrl_log = wx.TextCtrl(sb_log, style=wx.TE_MULTILINE, size=wx.Size(-1, 200))
+        self.textctrl_log = wx.TextCtrl(sb_log, style=wx.TE_MULTILINE|wx.TE_READONLY, size=wx.Size(-1, 200))
+        self.AddLogMessage("INFO", "MQTT:Connecting...")
         
         # add to staticbox sizer
         sb_log_sizer.AddSpacer(dip(15))
@@ -111,6 +113,10 @@ class SidePanel(wx.Panel):
 
 
         self.sizer.Layout()
+
+    def AddLogMessage(self, type: str, value:str):
+        message = f"{datetime.datetime.now().strftime("%H:%M:%S")}  [{type}] - {value}\n"
+        self.textctrl_log.AppendText(message)
 
     def SetSTStatus(self, value:bool):
         if value:

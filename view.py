@@ -8,7 +8,7 @@ import numpy as np
 from OpenGL.GL import *
 from OpenGL.GL.shaders import compileShader, compileProgram
 from math import sin, cos
-from utils import read_obj
+from utils import read_obj, ReadOBJ
 import time
 from random import uniform
 
@@ -35,7 +35,7 @@ class VehicleBase:
         self.material_data = {
             "shininess": 64.0,
             "ambient": [0.2, 0.2, 0.2],
-            "diffuse": [0.2, 0.2, 0.2],
+            "diffuse": [0.3, 0.3, 0.3],
             "specular": [0.5, 0.5, 0.5]
         }
 
@@ -150,7 +150,7 @@ class VehicleBase:
         out vec4 FragColor;
         void main() {
           //FragColor = vec4(90/255.0,121/255.0,200/255.0, 1.0f); // 0.6 red only // 90/255.0, 121/255.0, 200/255.0
-          FragColor = vec4(0.4f, 0.4f, 0.4f, 1.0f);
+          FragColor = vec4(0.0f, 0.0f, 0.0f, 1.0f);
         }
         """
 
@@ -252,6 +252,296 @@ class VehicleBase:
         glCullFace(GL_BACK)
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
         glDrawArrays(GL_TRIANGLES, 0, self.vertex_count)
+
+class VehicleArm:
+    def __init__(self):
+
+        self.shader_program = None
+
+        self.material_data = {
+            "shininess": 64.0,
+            "ambient": [0.2, 0.2, 0.2],
+            "diffuse": [0.2, 0.2, 0.2],
+            "specular": [0.5, 0.5, 0.5]
+        }
+
+    def init_object(self) -> None:
+
+        # ------------------------------------------------------------
+        # shaders
+        # ------------------------------------------------------------
+        
+        source_vertex = """
+        #version 330 core
+        
+        uniform mat4 projection;
+        uniform mat4 view;
+        uniform mat4 model;
+        
+        layout (location = 0) in vec3 vertex_position;
+        layout (location = 1) in vec3 vertex_color;
+        layout (location = 2) in vec3 vertex_normal;
+        
+        out vec3 normal;
+        out vec3 color;
+        out vec3 frag_pos;
+        
+        void main() {
+          normal = mat3(transpose(inverse(model))) * vertex_normal;
+          color = vertex_color;
+          frag_pos = vec3(model * vec4(vertex_position, 1.0));
+          gl_Position = projection * view * model * vec4(vertex_position, 1.0);
+        }
+        """
+
+        source_fragment = """
+        #version 330 core
+
+        struct LightDirectional {
+          vec3 direction;
+          vec3 ambient;
+          vec3 diffuse;
+          vec3 specular;
+        };
+
+        struct Material {
+          float shininess;
+          vec3 ambient;
+          vec3 diffuse;
+          vec3 specular;
+        };
+
+        uniform bool bool_lighting;
+        uniform vec3 view_pos;
+        
+        uniform LightDirectional light_directional;
+        uniform Material material;
+        
+        in vec3 color;
+        in vec3 normal;
+        in vec3 frag_pos;
+        out vec4 frag_color;
+
+        // prototypes
+        vec3 CalcLightDir(LightDirectional light, vec3 normal, vec3 view_dir);
+        
+        void main() {
+        
+          vec3 result;
+        
+          if (bool_lighting) {
+            vec3 norm = normalize(normal);
+            vec3 view_dir = normalize(view_pos - frag_pos);
+            result = CalcLightDir(light_directional, norm, view_dir);
+          } else {
+            result = color;
+          }
+          frag_color = vec4(result, 1.0);
+        }
+
+        vec3 CalcLightDir(LightDirectional light, vec3 normal, vec3 view_dir) {
+          vec3 light_dir = normalize(-light.direction);
+          float diff = max(dot(normal, light_dir), 0.0);
+          vec3 reflect_dir = reflect(-light_dir, normal);
+          float spec = pow(max(dot(view_dir, reflect_dir), 0.0), material.shininess);
+
+          vec3 ambient = light.ambient * material.ambient;
+          vec3 diffuse = light.diffuse * diff * material.diffuse;
+          vec3 specular = light.specular * spec * material.specular;
+
+          return (ambient + diffuse + specular) * color;
+        }
+        """
+
+        vertex_shader = compileShader(source_vertex, GL_VERTEX_SHADER)
+        fragment_shader = compileShader(source_fragment, GL_FRAGMENT_SHADER)
+        self.shader_program = compileProgram(vertex_shader, fragment_shader)
+
+        source_vertex = """
+        #version 330 core
+
+        layout (location = 0) in vec3 v_pos;
+ 
+        uniform mat4 model;
+        uniform mat4 view;
+        uniform mat4 projection;
+
+        void main() {
+          gl_Position = projection * view * model * vec4(v_pos, 1.0f);
+        }
+        """
+
+        source_fragment = """
+        #version 330 core
+        out vec4 FragColor;
+        void main() {
+          //FragColor = vec4(90/255.0,121/255.0,200/255.0, 1.0f); // 0.6 red only // 90/255.0, 121/255.0, 200/255.0
+          FragColor = vec4(0.4f, 0.4f, 0.4f, 1.0f);
+        }
+        """
+
+        vertex_shader_wire = compileShader(source_vertex, GL_VERTEX_SHADER)
+        fragment_shader_wire = compileShader(source_fragment, GL_FRAGMENT_SHADER)
+        self.shader_program_wire = compileProgram(vertex_shader_wire, fragment_shader_wire)
+
+        # ------------------------------------------------------------
+        # read obj files
+        # ------------------------------------------------------------
+
+        p1 = ReadOBJ("objects/servo_support.obj")
+        self.vao_p1 = self.setup_vao(p1)
+        self.vertex_count_p1 = len(p1.vertices)
+
+        p2 = ReadOBJ("objects/servo_motor.obj")
+        self.vao_p2 = self.setup_vao(p2)
+        self.vertex_count_p2 = len(p2.vertices)
+
+        p3 = ReadOBJ("objects/servo_adapter.obj")
+        self.vao_p3 = self.setup_vao(p3)
+        self.vertex_count_p3 = len(p3.vertices)
+
+        p4 = ReadOBJ("objects/servo_support.obj")
+        self.vao_p4 = self.setup_vao(p4)
+        self.vertex_count_p4 = len(p4.vertices)
+
+        p5 = ReadOBJ("objects/servo_motor.obj")
+        self.vao_p5 = self.setup_vao(p5)
+        self.vertex_count_p5 = len(p5.vertices)
+
+        p6 = ReadOBJ("objects/servo_adapter.obj")
+        self.vao_p6 = self.setup_vao(p6)
+        self.vertex_count_p6 = len(p6.vertices)
+
+        p7 = ReadOBJ("objects/arm.obj")
+        self.vao_p7 = self.setup_vao(p7)
+        self.vertex_count_p7 = len(p7.vertices)
+
+    def setup_vao(self, obj_data: ReadOBJ):
+        # ----------------- vao ----------------- #
+        vao = glGenVertexArrays(1)
+        glBindVertexArray(vao)
+        # --------------- position --------------- #
+        vbo_position = glGenBuffers(1)
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_position)
+        glBufferData(GL_ARRAY_BUFFER, obj_data.vertices.flatten(), GL_STATIC_DRAW)
+        glVertexAttribPointer(0, 3, GL_FLOAT, False, 0, ctypes.c_void_p(0)) # position
+        glEnableVertexAttribArray(0)
+        # ---------------- color ---------------- #
+        vbo_colors = glGenBuffers(1)
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_colors)
+        glBufferData(GL_ARRAY_BUFFER, obj_data.colors.flatten(), GL_STATIC_DRAW)
+        glVertexAttribPointer(1, 3, GL_FLOAT, False, 0, ctypes.c_void_p(0)) # color
+        glEnableVertexAttribArray(1)
+        # --------------- normals --------------- #
+        vbo_normals = glGenBuffers(1)
+        glBindBuffer(GL_ARRAY_BUFFER, vbo_normals)
+        glBufferData(GL_ARRAY_BUFFER, obj_data.normals.flatten(), GL_STATIC_DRAW)
+        glVertexAttribPointer(2, 3, GL_FLOAT, False, 0, ctypes.c_void_p(0)) # normal
+        glEnableVertexAttribArray(2)
+
+        glBindBuffer(GL_ARRAY_BUFFER, 0)
+        glBindVertexArray(0)
+
+        self.vertex_count = len(obj_data.vertices)
+
+        return vao
+    
+    def draw_vao(self, vao, vertex_count, model, camera: Camera, light_directional: dict, vehicle_base: VehicleBase):
+
+        glBindVertexArray(vao)
+
+        view = glm.lookAt(camera.position, camera.position + camera.front, camera.up)
+
+        # ----------- draw in wireframe ----------- #
+        
+        glUseProgram(self.shader_program_wire)
+        loc_model = glGetUniformLocation(self.shader_program_wire, b"model")
+        loc_view = glGetUniformLocation(self.shader_program_wire, b"view")
+        loc_projection = glGetUniformLocation(self.shader_program_wire, b"projection")
+        glUniformMatrix4fv(loc_model, 1, GL_FALSE, glm.value_ptr(model))
+        glUniformMatrix4fv(loc_view, 1, GL_FALSE, glm.value_ptr(view))
+        glUniformMatrix4fv(loc_projection, 1, GL_FALSE, glm.value_ptr(camera.projection))
+        glLineWidth(2)
+        glEnable(GL_CULL_FACE)
+        glCullFace(GL_FRONT)
+        glPolygonMode(GL_FRONT_AND_BACK, GL_LINE)
+        glDrawArrays(GL_TRIANGLES, 0, vertex_count)
+
+        # ----------- redraw as solid ----------- #
+
+        glUseProgram(self.shader_program)
+        loc_model = glGetUniformLocation(self.shader_program, b"model")
+        loc_view = glGetUniformLocation(self.shader_program, b"view")
+        loc_projection = glGetUniformLocation(self.shader_program, b"projection")
+        glUniformMatrix4fv(loc_model, 1, GL_FALSE, glm.value_ptr(model))
+        glUniformMatrix4fv(loc_view, 1, GL_FALSE, glm.value_ptr(view))
+        glUniformMatrix4fv(loc_projection, 1, GL_FALSE, glm.value_ptr(camera.projection))
+
+        # fragment uniforms
+        
+        glUniform1i(glGetUniformLocation(self.shader_program, b"bool_lighting"), 1)
+        glUniform3f(glGetUniformLocation(self.shader_program, b"view_pos"),
+                    camera.position.x,
+                    camera.position.y,
+                    camera.position.z)
+
+        glUniform3f(glGetUniformLocation(self.shader_program, b"light_directional.direction"), *light_directional["direction"])
+        glUniform3f(glGetUniformLocation(self.shader_program, b"light_directional.ambient"), *light_directional["ambient"])
+        glUniform3f(glGetUniformLocation(self.shader_program, b"light_directional.diffuse"), *light_directional["diffuse"])
+        glUniform3f(glGetUniformLocation(self.shader_program, b"light_directional.specular"), *light_directional["specular"])
+
+        glUniform1f(glGetUniformLocation(self.shader_program, b"material.shininess"), self.material_data["shininess"])
+        glUniform3f(glGetUniformLocation(self.shader_program, b"material.ambient"), *self.material_data["ambient"])
+        glUniform3f(glGetUniformLocation(self.shader_program, b"material.diffuse"), *self.material_data["diffuse"])
+        glUniform3f(glGetUniformLocation(self.shader_program, b"material.specular"), *self.material_data["specular"])
+        
+        glDisable(GL_CULL_FACE)
+        glCullFace(GL_BACK)
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
+        glDrawArrays(GL_TRIANGLES, 0, vertex_count)
+
+    def draw_object(self, camera: Camera, light_directional: dict, vehicle_base: VehicleBase) -> None:
+
+        if self.shader_program == None:
+            return
+        
+        # ----------- p1 ----------- # support
+        model_p1 = vehicle_base.model
+        model_p1 = glm.translate(model_p1, glm.vec3(0.0, 85.0, 80.0))
+        model_p1 = glm.rotate(model_p1, glm.pi(), glm.vec3(1.0, 0.0, 0.0))
+        model_p1 = glm.rotate(model_p1, glm.pi(), glm.vec3(0.0, 1.0, 0.0))
+        self.draw_vao(self.vao_p1, self.vertex_count_p1, model_p1, camera, light_directional, vehicle_base)
+        # ----------- p2 ----------- # motor
+        model_p2 = model_p1
+        model_p2 = glm.rotate(model_p2, glm.pi(), glm.vec3(1.0, 0.0, 0.0))
+        model_p2 = glm.translate(model_p2, glm.vec3(10.3, 24, 11.4))
+        self.draw_vao(self.vao_p2, self.vertex_count_p2, model_p2, camera, light_directional, vehicle_base)
+        # ----------- p3 ----------- # adapter
+        model_p3 = model_p2
+        model_p3 = glm.rotate(model_p3, sin(time.time()), glm.vec3(0.0, 1.0, 0.0))
+        self.draw_vao(self.vao_p3, self.vertex_count_p3, model_p3, camera, light_directional, vehicle_base)
+        # ----------- p4 ----------- # support
+        model_p4 = model_p3
+        model_p4 = glm.rotate(model_p4, glm.pi()/2, glm.vec3(1.0, 0.0, 0.0))
+        model_p4 = glm.rotate(model_p4, -glm.pi()/2, glm.vec3(0.0, 0.0, 1.0))
+        model_p4 = model_p4 * glm.translate(glm.mat4(1.0), glm.vec3(0.0, 0.0, -8.5))
+        self.draw_vao(self.vao_p4, self.vertex_count_p4, model_p4, camera, light_directional, vehicle_base)
+        # ----------- p5 ----------- # motor
+        model_p5 = model_p4
+        model_p5 = glm.rotate(model_p5, glm.pi(), glm.vec3(1.0, 0.0, 0.0))
+        model_p5 = glm.translate(model_p5, glm.vec3(10.3, 24, 11.4))
+        self.draw_vao(self.vao_p5, self.vertex_count_p5, model_p5, camera, light_directional, vehicle_base)
+        # ----------- p6 ----------- # adapter
+        model_p6 = model_p5
+        model_p6 = glm.rotate(model_p6, sin(time.time()), glm.vec3(0.0, 1.0, 0.0))
+        self.draw_vao(self.vao_p6, self.vertex_count_p6, model_p6, camera, light_directional, vehicle_base)
+        # ----------- p7 ----------- #
+        model_p7 = model_p6
+        model_p7 = glm.rotate(model_p7, glm.pi()/2, glm.vec3(1.0, 0.0, 0.0))
+        model_p7 = glm.rotate(model_p7, glm.pi()/2, glm.vec3(0.0, 1.0, 0.0))
+        model_p7 = glm.translate(model_p7, glm.vec3(-19.3, 0.0, 0.0))
+        self.draw_vao(self.vao_p7, self.vertex_count_p7, model_p7, camera, light_directional, vehicle_base)
+        
 
 class WarningPanel:
     def __init__(self, width=140, height=140):
@@ -611,6 +901,9 @@ class PanelView(glcanvas.GLCanvas):
             self.vehicle_base = VehicleBase()
             self.vehicle_base.init_object()
 
+            self.vehicle_arm = VehicleArm()
+            self.vehicle_arm.init_object()
+
             self.path_tracer = PathTracer()
             self.path_tracer.init_object()
 
@@ -694,11 +987,13 @@ class PanelView(glcanvas.GLCanvas):
 
         self.sky_sphere.draw_object(self.camera)
         self.vehicle_base.draw_object(self.camera, self.light_directional)
+        self.vehicle_arm.draw_object(self.camera, self.light_directional, self.vehicle_base)
         self.path_tracer.draw_object(self.camera)
-        self.warning_panel_north.draw_object(self.camera, self.vehicle_base, "north", True)
-        self.warning_panel_south.draw_object(self.camera, self.vehicle_base, "south", True)
-        self.warning_panel_east.draw_object(self.camera, self.vehicle_base, "east", True)
-        self.warning_panel_west.draw_object(self.camera, self.vehicle_base, "west", True)
+        show_warning_panels = False
+        self.warning_panel_north.draw_object(self.camera, self.vehicle_base, "north", show_warning_panels)
+        self.warning_panel_south.draw_object(self.camera, self.vehicle_base, "south", show_warning_panels)
+        self.warning_panel_east.draw_object(self.camera, self.vehicle_base, "east", show_warning_panels)
+        self.warning_panel_west.draw_object(self.camera, self.vehicle_base, "west", show_warning_panels)
 
         self.SwapBuffers()
         event.Skip()
@@ -732,11 +1027,11 @@ class PanelView(glcanvas.GLCanvas):
         elapsed_time = current_time - self.start_time
         self.delta_time = elapsed_time
         self.start_time = current_time
-        self.vehicle_base.model = glm.translate(self.vehicle_base.model,
-                                                glm.vec3(uniform(-5, 2),
-                                                         uniform(-0.5, 0.5),
-                                                         uniform(-2, 5)))
-        self.vehicle_base.model = glm.rotate(self.vehicle_base.model, 0.01, glm.vec3(0.0, 1.0, 0.0))
-        self.vehicle_base.model = glm.rotate(self.vehicle_base.model, 0.007, glm.vec3(0.5, 0.5, 0.5))
+        # self.vehicle_base.model = glm.translate(self.vehicle_base.model,
+        #                                         glm.vec3(uniform(-5, 2),
+        #                                                  uniform(-0.5, 0.5),
+        #                                                  uniform(-2, 5)))
+        # self.vehicle_base.model = glm.rotate(self.vehicle_base.model, 0.01, glm.vec3(0.0, 1.0, 0.0))
+        # self.vehicle_base.model = glm.rotate(self.vehicle_base.model, 0.007, glm.vec3(0.5, 0.5, 0.5))
         self.Refresh(False)
         event.Skip()
