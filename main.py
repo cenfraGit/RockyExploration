@@ -1,12 +1,15 @@
 # main.py
 
 import wx
+import wx.aui as aui
 from utils import dip
 from camera import FrameCamera
 from view import PanelView
-from sidepanel import SidePanel
+from panelinfo import PanelInfo
+from statusbar import CustomStatusBar
 from mqtt_handler import MQTTHandler
 import json
+import datetime
 
 import ctypes
 ctypes.windll.shcore.SetProcessDpiAwareness(1)
@@ -24,31 +27,37 @@ class FrameMain(wx.Frame):
         self.SetTitle("Rocky Exploration UI - v1.0")
         self.SetClientSize(dip(800, 500))
 
-        # all subpanels will be children of the main panel
-        self.panel_main = wx.Panel(self)
-        self.sizer = wx.GridBagSizer()
-        self.panel_main.SetSizer(self.sizer)
+        self.connection_status = False
 
-        # ----------- mqtt ----------- #
+        self._mgr = aui.AuiManager()
+        self._mgr.SetManagedWindow(self)
 
-        self.mqtt_handler = MQTTHandler()        
+        self._panel_view = PanelView(self)
+        self._panel_info = PanelInfo(self)
 
-        # -------------- panel view -------------- #
+        textctrl_font = wx.Font(10, wx.FONTFAMILY_MODERN, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False, "Courier")
 
-        self.panel_view = PanelView(self.panel_main)
-        self.sizer.Add(self.panel_view, pos=(0, 0), flag=wx.EXPAND)
+        self._textctrl_log = wx.TextCtrl(self, style=wx.TE_MULTILINE|wx.TE_READONLY|wx.NO_BORDER, size=wx.Size(-1, 90))
+        self._textctrl_log.SetFont(textctrl_font)
+        self.AddLogMessage("INFO", "Initialized.")
 
-        # ----------- panel info ----------- #
-        
-        self.panel_info = SidePanel(self.panel_main)
-        self.sizer.Add(self.panel_info, pos=(0, 1), flag=wx.EXPAND)
+        self._textctrl_mqtt = wx.TextCtrl(self, style=wx.TE_MULTILINE|wx.TE_READONLY|wx.NO_BORDER, size=wx.Size(-1, 90))
+        self._textctrl_mqtt.SetFont(textctrl_font)
 
-        # ----------- sizer growables ----------- #
-        
-        self.sizer.AddGrowableCol(0, 3)
-        self.sizer.AddGrowableCol(1, 1)
-        self.sizer.AddGrowableRow(0, 1)
-        self.sizer.Layout()
+        self._mgr.AddPane(self._panel_view, aui.AuiPaneInfo().Name("view").Top().CenterPane())
+        self._mgr.AddPane(self._panel_info, aui.AuiPaneInfo().Name("info").Caption("Info").CloseButton(True))
+        self._mgr.AddPane(self._textctrl_log, aui.AuiPaneInfo().Name("textctrl_log").Caption("Log").CloseButton(False))
+        self._mgr.AddPane(self._textctrl_mqtt, aui.AuiPaneInfo().Name("textctrl_mqtt").Caption("MQTT").CloseButton(True))
+
+        self._mgr.GetPane("view").Show().CenterPane()
+        self._mgr.GetPane("textctrl_log").Show().Bottom()
+        self._mgr.GetPane("textctrl_mqtt").Show().Left()
+        self._mgr.GetPane("info").Show().Right().MinSize(wx.Size(300, -1))
+
+        self._mgr.Update()
+
+        self._mgr.GetArtProvider().SetColour(aui.AUI_DOCKART_INACTIVE_CAPTION_COLOUR, wx.Colour(100,151,177))
+        self._mgr.GetArtProvider().SetMetric(aui.AUI_DOCKART_GRADIENT_TYPE, aui.AUI_GRADIENT_NONE)
 
         # ------------------------------------------------------------
         # menubar
@@ -60,12 +69,15 @@ class FrameMain(wx.Frame):
         
         menu_configuration = wx.Menu()
         item_connect = wx.MenuItem(menu_configuration, -1, "&Connect...", "Connect to a MQTT server.")
+        item_disconnect = wx.MenuItem(menu_configuration, -1, "&Disconnect...", "Disconnect from the server.")
         item_exit = wx.MenuItem(menu_configuration, wx.ID_EXIT, "&Exit...\tAlt+F4", "Exit the application.")
         menu_configuration.Append(item_connect)
+        menu_configuration.Append(item_disconnect)
         menu_configuration.AppendSeparator()
         menu_configuration.Append(item_exit)
 
         self.Bind(wx.EVT_MENU, self.OnConnect, item_connect)
+        self.Bind(wx.EVT_MENU, self.OnDisconnect, item_disconnect)
         self.Bind(wx.EVT_MENU, self.OnExit, item_exit)
 
         # ----------------- view ----------------- #
@@ -88,17 +100,40 @@ class FrameMain(wx.Frame):
 
         # -------------- statusbar -------------- #
 
-        self.statusbar = self.CreateStatusBar()
-        self.statusbar.SetStatusText("Welcome to RE v1.0")
+        self.statusbar = CustomStatusBar(self)
+        self.SetStatusBar(self.statusbar)
+
+        # ------------------------------------------------------------
+        # mqtt
+        # ------------------------------------------------------------
+
+        self.mqtt_handler = MQTTHandler(self._textctrl_mqtt)
 
     def OnConnect(self, event):
         with open("config.json", "r") as file:
             data = json.load(file)
-        dlg = wx.TextEntryDialog(self, "IP:", "MQTT Server", value=data["server_address"])
+        dlg = wx.TextEntryDialog(self, "Server address:", "MQTT Server", value=data["server_address"])
         if dlg.ShowModal() == wx.ID_CANCEL:
             return
+        self.AddLogMessage("INFO", "MQTT: Connecting...")
         self.mqtt_handler.SetBrokerAddress(dlg.GetValue())
-        self.mqtt_handler.connect()
+        self.connection_status = self.mqtt_handler.connect()
+        self.statusbar.SetSTStatus(self.connection_status)
+        if self.connection_status:
+            self.AddLogMessage("INFO", f"MQTT: Successfully connected to {dlg.GetValue()}.")
+            self.statusbar.SetSTAddress(dlg.GetValue())
+        else:
+            self.AddLogMessage("INFO", f"MQTT: Could not connect to \"{dlg.GetValue()}\". Please check the connection.")
+
+    def OnDisconnect(self, event):
+        if self.connection_status:
+            self.mqtt_handler.disconnect()
+            self.statusbar.SetSTStatus(False)
+            self.statusbar.SetSTAddress("0.0.0.0")
+            self.AddLogMessage("INFO", f"MQTT: Disconnected successfully.")
+            self.connection_status = False
+        else:
+            wx.MessageDialog(self, "Server is offline.", "Disconnect failed.", style=wx.OK).ShowModal()
 
     def OnExit(self, event):
         self.Close()
@@ -106,6 +141,10 @@ class FrameMain(wx.Frame):
     def OnCamera(self, event):
         frame = FrameCamera(self)
         frame.Show()
+
+    def AddLogMessage(self, type: str, value:str):
+        message = f">> {datetime.datetime.now().strftime("%H:%M:%S")} [{type}] - {value}\n"
+        self._textctrl_log.AppendText(message)
 
 if __name__ == "__main__":
     app = wx.App()
