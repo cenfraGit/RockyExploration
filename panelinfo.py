@@ -1,8 +1,8 @@
 # panelinfo.py
 
 import wx
+import wx.grid as grid
 from utils import dip
-import datetime
 
 class PanelInfo(wx.Panel):
     def __init__(self, parent):
@@ -10,35 +10,6 @@ class PanelInfo(wx.Panel):
 
         self.sizer = wx.BoxSizer(wx.VERTICAL)
         self.SetSizer(self.sizer)
-
-        # ------------------------------------------------------------
-        # status
-        # ------------------------------------------------------------
-        
-        # # create staticbox
-        # sb_status = wx.StaticBox(self, label="Status")
-        # sb_status_sizer = wx.GridBagSizer(dip(3), dip(3))
-        # sb_status.SetSizer(sb_status_sizer)
-
-        # # modifiable statictexts
-        # self.statictext_status = wx.StaticText(sb_status, label="")
-        # self.statictext_network = wx.StaticText(sb_status, label="")
-        # self.statictext_server = wx.StaticText(sb_status, label="")
-        
-        # # add to staticbox sizer
-        # sb_status_sizer.Add(wx.StaticText(sb_status, label="Status:"), pos=(0, 0), flag=wx.ALIGN_RIGHT|wx.TOP, border=dip(15))
-        # sb_status_sizer.Add(self.statictext_status, pos=(0, 1), flag=wx.ALIGN_LEFT|wx.TOP, border=dip(15))
-        # sb_status_sizer.Add(wx.StaticText(sb_status, label="Server:"), pos=(1, 0), flag=wx.ALIGN_RIGHT|wx.BOTTOM, border=dip(10))
-        # sb_status_sizer.Add(self.statictext_server, pos=(1, 1), flag=wx.ALIGN_LEFT|wx.BOTTOM, border=dip(10))
-        # sb_status_sizer.AddGrowableCol(0, 1)
-        # sb_status_sizer.AddGrowableCol(1, 2)
-
-        # # set default values
-        # self.SetSTStatus(False)
-        # self.SetSTServerAddress("None")
-
-        # # add to main sizer
-        # self.sizer.Add(sb_status, proportion=0, flag=wx.EXPAND|wx.LEFT|wx.TOP|wx.RIGHT, border=dip(5))
 
         # ------------------------------------------------------------
         # vehicle data
@@ -86,49 +57,8 @@ class PanelInfo(wx.Panel):
         # add to main sizer
         self.sizer.Add(sb_vehicledata, proportion=0, flag=wx.EXPAND|wx.LEFT|wx.TOP|wx.RIGHT, border=dip(5))
 
-        # ------------------------------------------------------------
-        # voice control
-        # ------------------------------------------------------------
-
-        # # create staticbox
-        # sb_voicecontrol = wx.StaticBox(self, label="Voice control")
-        # sb_voicecontrol_sizer = wx.GridBagSizer(dip(3), dip(3))
-        # sb_voicecontrol.SetSizer(sb_voicecontrol_sizer)
-
-        # # modifiable statictexts
-        # self.test = wx.TextCtrl(sb_voicecontrol)
-        # button_talk = wx.Button(sb_voicecontrol, label="Talk to Rocky...")
-        
-        # # add to staticbox sizer
-        # sb_voicecontrol_sizer.Add(self.test, pos=(0, 0), flag=wx.EXPAND|wx.TOP, border=dip(15))
-        # sb_voicecontrol_sizer.Add(button_talk, pos=(1, 0), flag=wx.EXPAND|wx.BOTTOM, border=dip(15))
-        # sb_voicecontrol_sizer.AddGrowableCol(0, 1)
-
-        # # add to main sizer
-        # self.sizer.Add(sb_voicecontrol, proportion=0, flag=wx.EXPAND|wx.LEFT|wx.TOP|wx.RIGHT, border=dip(5))
-
-        # ------------------------------------------------------------
-        # log
-        # ------------------------------------------------------------
-
-        # # create staticbox
-        # sb_log = wx.StaticBox(self, label="Log")
-        # sb_log_sizer = wx.BoxSizer(wx.VERTICAL)
-        # sb_log.SetSizer(sb_log_sizer)
-
-        # self.textctrl_log = wx.TextCtrl(sb_log, style=wx.TE_MULTILINE|wx.TE_READONLY, size=wx.Size(-1, 200))
-        # font = wx.Font(9, wx.FONTFAMILY_MODERN, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False, "Courier")
-        # self.textctrl_log.SetFont(font)
-        # self.AddLogMessage("INFO", "Initialized.")
-        
-        # # add to staticbox sizer
-        # sb_log_sizer.AddSpacer(dip(15))
-        # sb_log_sizer.Add(self.textctrl_log, flag=wx.EXPAND|wx.ALL, border=dip(3))
-
-        # # add to main sizer
-        # self.sizer.Add(sb_log, proportion=0, flag=wx.EXPAND|wx.LEFT|wx.TOP|wx.RIGHT, border=dip(5))
-
         self.sizer.Layout()
+        
 
     def SetSTAcceleration(self, x:str="None", y:str="None", z:str="None"):
         self.statictext_acceleration_x.SetLabel(x)

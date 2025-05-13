@@ -34,7 +34,7 @@ class FrameMain(wx.Frame):
 
         self._mgr = aui.AuiManager()
         self._mgr.SetManagedWindow(self)
-
+        
         self._panel_view = PanelView(self, self.vehicle_state)
         self._panel_info = PanelInfo(self)
         url = "http://172.20.10.11:81/stream"
@@ -60,9 +60,10 @@ class FrameMain(wx.Frame):
 
         self._mgr.GetPane("view").Show().CenterPane()
         self._mgr.GetPane("camera").Show().Left().MinSize(wx.Size(300, 300))
+        self._mgr.GetPane("info").Show().Left()
+        self._mgr.GetPane("textctrl_mqtt").Show().Right().MinSize(wx.Size(300, -1))
         self._mgr.GetPane("textctrl_log").Show().Bottom()
-        self._mgr.GetPane("textctrl_mqtt").Show().Left()
-        self._mgr.GetPane("info").Show().Right().MinSize(wx.Size(300, -1))
+        
 
         self._mgr.Update()
 
@@ -93,6 +94,7 @@ class FrameMain(wx.Frame):
         # ----------------- view ----------------- #
 
         menu_view = wx.Menu()
+        """
         item_camera_footage = wx.MenuItem(menu_view, -1, "Show camera footage...", "Show Rocky's camera footage in an external window.")
         item_topics = wx.MenuItem(menu_view, -1, "Show MQTT messages...", "Show all messages on the server.")
         
@@ -100,6 +102,7 @@ class FrameMain(wx.Frame):
         menu_view.Append(item_topics)
 
         self.Bind(wx.EVT_MENU, self.OnCamera, item_camera_footage)
+        """
 
         # ------------ setup menubar ------------ #
 
