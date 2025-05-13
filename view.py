@@ -416,6 +416,22 @@ class VehicleArm:
         self.vao_p7 = self.setup_vao(p7)
         self.vertex_count_p7 = len(p7.vertices)
 
+        p8 = ReadOBJ("objects/servo_adapter.obj")
+        self.vao_p8 = self.setup_vao(p8)
+        self.vertex_count_p8 = len(p8.vertices)
+
+        p9 = ReadOBJ("objects/servo_motor.obj")
+        self.vao_p9 = self.setup_vao(p9)
+        self.vertex_count_p9 = len(p9.vertices)
+
+        p10 = ReadOBJ("objects/servo_support.obj")
+        self.vao_p10 = self.setup_vao(p10)
+        self.vertex_count_p10 = len(p10.vertices)
+
+        p11 = ReadOBJ("objects/arm_gripper_union.obj")
+        self.vao_p11 = self.setup_vao(p11)
+        self.vertex_count_p11 = len(p11.vertices)
+
     def setup_vao(self, obj_data: ReadOBJ):
         # ----------------- vao ----------------- #
         vao = glGenVertexArrays(1)
@@ -518,7 +534,7 @@ class VehicleArm:
         self.draw_vao(self.vao_p2, self.vertex_count_p2, model_p2, camera, light_directional, vehicle_base)
         # ----------- p3 ----------- # adapter
         model_p3 = model_p2
-        model_p3 = glm.rotate(model_p3, sin(time.time()), glm.vec3(0.0, 1.0, 0.0))
+        #model_p3 = glm.rotate(model_p3, sin(time.time()), glm.vec3(0.0, 1.0, 0.0))
         self.draw_vao(self.vao_p3, self.vertex_count_p3, model_p3, camera, light_directional, vehicle_base)
         # ----------- p4 ----------- # support
         model_p4 = model_p3
@@ -533,7 +549,7 @@ class VehicleArm:
         self.draw_vao(self.vao_p5, self.vertex_count_p5, model_p5, camera, light_directional, vehicle_base)
         # ----------- p6 ----------- # adapter
         model_p6 = model_p5
-        model_p6 = glm.rotate(model_p6, sin(time.time()), glm.vec3(0.0, 1.0, 0.0))
+        #model_p6 = glm.rotate(model_p6, sin(time.time()), glm.vec3(0.0, 1.0, 0.0))
         self.draw_vao(self.vao_p6, self.vertex_count_p6, model_p6, camera, light_directional, vehicle_base)
         # ----------- p7 ----------- #
         model_p7 = model_p6
@@ -541,6 +557,25 @@ class VehicleArm:
         model_p7 = glm.rotate(model_p7, glm.pi()/2, glm.vec3(0.0, 1.0, 0.0))
         model_p7 = glm.translate(model_p7, glm.vec3(-19.3, 0.0, 0.0))
         self.draw_vao(self.vao_p7, self.vertex_count_p7, model_p7, camera, light_directional, vehicle_base)
+        # ----------- p8 ----------- # adapter
+        model_p8 = model_p7
+        model_p8 = glm.rotate(model_p8, glm.pi()/2, glm.vec3(0.0, 0.0, 1.0))
+        model_p8 = glm.translate(model_p8, glm.vec3(180.0, 19.3, 0.0))
+        self.draw_vao(self.vao_p8, self.vertex_count_p8, model_p8, camera, light_directional, vehicle_base)
+        # ------------------ p9 ------------------ # motor
+        model_p9 = model_p8
+        model_p9 = glm.rotate(model_p9, glm.pi(), glm.vec3(0.0, 1.0, 0.0))
+        self.draw_vao(self.vao_p9, self.vertex_count_p9, model_p9, camera, light_directional, vehicle_base)
+        # ----------------- p10 ----------------- # support
+        model_p10 = model_p9
+        model_p10 = glm.rotate(model_p10, -glm.pi(), glm.vec3(0.0, 0.0, 1.0))
+        model_p10 = glm.translate(model_p10, glm.vec3(10.3, 24, 11.4))
+        self.draw_vao(self.vao_p10, self.vertex_count_p10, model_p10, camera, light_directional, vehicle_base)
+        # ----------------- p10 ----------------- # arm gripper union
+        model_p11 = model_p10
+        model_p11 = glm.rotate(model_p11, -glm.pi()/2, glm.vec3(0.0, 0.0, 1.0))
+        model_p11 = glm.translate(model_p11, glm.vec3(4.4, 10.0, 2.0))
+        self.draw_vao(self.vao_p11, self.vertex_count_p11, model_p11, camera, light_directional, vehicle_base)
         
 class WarningPanel:
     def __init__(self, width=140, height=140):

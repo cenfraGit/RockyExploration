@@ -1,6 +1,6 @@
 {
     "ssid": "",
     "password": "",
-    "_server_address": "192.168.100.31",
-    "server_address": "10.25.68.32"
+    "server_address": "192.168.100.31",
+    "_server_address": "10.25.68.32"
 }

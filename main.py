@@ -36,9 +36,10 @@ class FrameMain(wx.Frame):
         self._panel_view = PanelView(self)
         self._panel_info = PanelInfo(self)
         url = "http://172.20.10.11:81/stream"
-        self.capture = cv2.VideoCapture(0)
+        #self.capture = cv2.VideoCapture(0)
         #self.capture = cv2.VideoCapture(url)
-        self._panel_camera = PanelCamera(self, self.capture)
+        #self._panel_camera = PanelCamera(self, self.capture)
+        self._panel_camera = wx.Panel(self)
 
         textctrl_font = wx.Font(10, wx.FONTFAMILY_MODERN, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False, "Courier")
 
