@@ -5,17 +5,6 @@ import cv2
 import numpy as np
 from utils import dip
 
-class FrameCamera(wx.Frame):
-    def __init__(self, parent):
-        super().__init__(parent)
-
-        self.SetTitle("Camera")
-        self.SetClientSize(dip(300, 300))
-
-        self.capture = cv2.VideoCapture(0)
-        self.panel_camera = PanelCamera(self, self.capture)
-        self.panel_camera.SetBackgroundColour(wx.BLACK)
-
 class PanelCamera(wx.Panel):
     def __init__(self, parent, capture, fps=30):
         wx.Panel.__init__(self, parent)
@@ -35,6 +24,9 @@ class PanelCamera(wx.Panel):
 
     def OnPaint(self, event):
         dc = wx.AutoBufferedPaintDC(self)
+        dc.Clear()
+        #dc.SetBrush(wx.BLACK_BRUSH)
+        #dc.DrawRectangle(0, 0, *self.GetSize())
         if self.current_frame is not None:
             h, w = self.current_frame.shape[:2]
             frame_aspect = w / float(h)
@@ -53,10 +45,9 @@ class PanelCamera(wx.Panel):
                 start_y = 0
                 
             resized_frame = cv2.resize(self.current_frame, (new_width, new_height), interpolation=cv2.INTER_LINEAR)
+            resized_frame = cv2.flip(resized_frame, 0)
             bmp = wx.Bitmap.FromBuffer(new_width, new_height, resized_frame)
             dc.DrawBitmap(bmp, start_x, start_y)
-        else:
-            dc.Clear()
 
     def OnTimer(self, event):
         ret, frame = self.capture.read()

@@ -542,7 +542,6 @@ class VehicleArm:
         model_p7 = glm.translate(model_p7, glm.vec3(-19.3, 0.0, 0.0))
         self.draw_vao(self.vao_p7, self.vertex_count_p7, model_p7, camera, light_directional, vehicle_base)
         
-
 class WarningPanel:
     def __init__(self, width=140, height=140):
 

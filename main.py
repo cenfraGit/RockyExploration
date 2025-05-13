@@ -3,13 +3,14 @@
 import wx
 import wx.aui as aui
 from utils import dip
-from camera import FrameCamera
+from camera import PanelCamera
 from view import PanelView
 from panelinfo import PanelInfo
 from statusbar import CustomStatusBar
 from mqtt_handler import MQTTHandler
 import json
 import datetime
+import cv2
 
 import ctypes
 ctypes.windll.shcore.SetProcessDpiAwareness(1)
@@ -34,6 +35,10 @@ class FrameMain(wx.Frame):
 
         self._panel_view = PanelView(self)
         self._panel_info = PanelInfo(self)
+        url = "http://172.20.10.11:81/stream"
+        self.capture = cv2.VideoCapture(0)
+        #self.capture = cv2.VideoCapture(url)
+        self._panel_camera = PanelCamera(self, self.capture)
 
         textctrl_font = wx.Font(10, wx.FONTFAMILY_MODERN, wx.FONTSTYLE_NORMAL, wx.FONTWEIGHT_NORMAL, False, "Courier")
 
@@ -46,10 +51,12 @@ class FrameMain(wx.Frame):
 
         self._mgr.AddPane(self._panel_view, aui.AuiPaneInfo().Name("view").Top().CenterPane())
         self._mgr.AddPane(self._panel_info, aui.AuiPaneInfo().Name("info").Caption("Info").CloseButton(True))
+        self._mgr.AddPane(self._panel_camera, aui.AuiPaneInfo().Name("camera").Caption("Camera footage").CloseButton(True))
         self._mgr.AddPane(self._textctrl_log, aui.AuiPaneInfo().Name("textctrl_log").Caption("Log").CloseButton(False))
         self._mgr.AddPane(self._textctrl_mqtt, aui.AuiPaneInfo().Name("textctrl_mqtt").Caption("MQTT").CloseButton(True))
 
         self._mgr.GetPane("view").Show().CenterPane()
+        self._mgr.GetPane("camera").Show().Left().MinSize(wx.Size(300, 300))
         self._mgr.GetPane("textctrl_log").Show().Bottom()
         self._mgr.GetPane("textctrl_mqtt").Show().Left()
         self._mgr.GetPane("info").Show().Right().MinSize(wx.Size(300, -1))
@@ -139,8 +146,7 @@ class FrameMain(wx.Frame):
         self.Close()
 
     def OnCamera(self, event):
-        frame = FrameCamera(self)
-        frame.Show()
+        pass
 
     def AddLogMessage(self, type: str, value:str):
         message = f">> {datetime.datetime.now().strftime("%H:%M:%S")} [{type}] - {value}\n"
