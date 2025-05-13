@@ -8,6 +8,7 @@ from view import PanelView
 from panelinfo import PanelInfo
 from statusbar import CustomStatusBar
 from mqtt_handler import MQTTHandler
+from vehiclestate import VehicleState
 import json
 import datetime
 import cv2
@@ -29,11 +30,12 @@ class FrameMain(wx.Frame):
         self.SetClientSize(dip(800, 500))
 
         self.connection_status = False
+        self.vehicle_state = VehicleState()
 
         self._mgr = aui.AuiManager()
         self._mgr.SetManagedWindow(self)
 
-        self._panel_view = PanelView(self)
+        self._panel_view = PanelView(self, self.vehicle_state)
         self._panel_info = PanelInfo(self)
         url = "http://172.20.10.11:81/stream"
         #self.capture = cv2.VideoCapture(0)
@@ -115,7 +117,7 @@ class FrameMain(wx.Frame):
         # mqtt
         # ------------------------------------------------------------
 
-        self.mqtt_handler = MQTTHandler(self._textctrl_mqtt)
+        self.mqtt_handler = MQTTHandler(self._textctrl_mqtt, self.vehicle_state)
 
     def OnConnect(self, event):
         with open("config.json", "r") as file:

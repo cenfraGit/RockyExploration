@@ -1,25 +1,37 @@
 # mqtt_handler.py
 
 import paho.mqtt.client as mqtt
+from vehiclestate import VehicleState
 import threading
 import wx
 
 class MQTTHandler:
-    def __init__(self, textctrl:wx.TextCtrl):
+    def __init__(self, textctrl:wx.TextCtrl, vehicle_state: VehicleState):
         self.broker_address = None
         self.port = 1883
         self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
         self.client.on_connect = self.on_connect
         self.client.on_message = self.on_message
         self.textctrl = textctrl
+        self.vehicle_state = vehicle_state
+        self.topics = ["rocky/position", "rocky/arm/1", "rocky/arm/2"]
 
     def on_connect(self, client:mqtt.Client, userdata, flags, reason_code, properties):
-        client.subscribe("test/cenfra")
-        client.publish("test/cenfra", "Interface connected.")
+        client.subscribe([(topic, 0) for topic in self.topics])
+        #client.publish("test/cenfra", "Interface connected.")
+        #client.publish("rocky/position", "Interface connected222.")
     
     def on_message(self, client, userdata, msg):
-        message = f"{msg.topic} {msg.payload.decode("utf-8")}\n"
-        self.textctrl.AppendText(message)
+        # get message data
+        topic = msg.topic
+        message = msg.payload.decode("utf-8")
+        # add message to mqtt log
+        self.textctrl.AppendText(f"{topic} {message}\n")
+        # update vehicle state with data
+        if topic == "rocky/position":
+            x, y, z = message.split(' ')
+            x, y, z = float(x), float(y), float(z)
+            self.vehicle_state.add_position([x, y, z])
 
     def SetBrokerAddress(self, value:str):
         self.broker_address = value

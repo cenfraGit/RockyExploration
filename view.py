@@ -9,6 +9,7 @@ from OpenGL.GL import *
 from OpenGL.GL.shaders import compileShader, compileProgram
 from math import sin, cos
 from utils import read_obj, ReadOBJ
+from vehiclestate import VehicleState
 import time
 from random import uniform
 
@@ -191,6 +192,16 @@ class VehicleBase:
         return glm.vec3(self.model[3][0],
                         self.model[3][1],
                         self.model[3][2])
+    
+    def set_position(self, new_position: glm.vec3):
+        rotation_scale_matrix = glm.mat4(
+            self.model[0],
+            self.model[1],
+            self.model[2],
+            glm.vec4(0.0, 0.0, 0.0, 1.0)
+        )
+        translation_matrix = glm.translate(glm.mat4(1.0), new_position)
+        self.model = translation_matrix * rotation_scale_matrix
 
     def draw_object(self, camera: Camera, light_directional: dict) -> None:
 
@@ -879,7 +890,7 @@ class SkySphere:
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
 
 class PanelView(glcanvas.GLCanvas):
-    def __init__(self, parent):
+    def __init__(self, parent, vehicle_state: VehicleState):
 
         dispAttrs = glcanvas.GLAttributes()
         dispAttrs.PlatformDefaults().Depth(16).DoubleBuffer().EndList() # SampleBuffers(4).Samplers(4)
@@ -889,6 +900,8 @@ class PanelView(glcanvas.GLCanvas):
         self.context = None
         self.timer = wx.Timer()
         self.init = False
+
+        self.vehicle_state = vehicle_state
 
         self.camera = Camera()
         self.pressed_keys = []
@@ -1017,13 +1030,17 @@ class PanelView(glcanvas.GLCanvas):
 
         self.process_input()
 
-        self.path_tracer.add_position(self.vehicle_base.get_position())
+        # update values from vehicle_state
+        self.path_tracer.path_points = self.vehicle_state.path_points
+        if len(self.vehicle_state.path_points) > 0:
+            x, y, z = self.vehicle_state.path_points[-1]
+            self.vehicle_base.set_position(glm.vec3(x, y, z))
 
         self.sky_sphere.draw_object(self.camera)
         self.vehicle_base.draw_object(self.camera, self.light_directional)
         self.vehicle_arm.draw_object(self.camera, self.light_directional, self.vehicle_base)
         self.path_tracer.draw_object(self.camera)
-        show_warning_panels = False
+        show_warning_panels = True
         self.warning_panel_north.draw_object(self.camera, self.vehicle_base, "north", show_warning_panels)
         self.warning_panel_south.draw_object(self.camera, self.vehicle_base, "south", show_warning_panels)
         self.warning_panel_east.draw_object(self.camera, self.vehicle_base, "east", show_warning_panels)
@@ -1061,11 +1078,5 @@ class PanelView(glcanvas.GLCanvas):
         elapsed_time = current_time - self.start_time
         self.delta_time = elapsed_time
         self.start_time = current_time
-        # self.vehicle_base.model = glm.translate(self.vehicle_base.model,
-        #                                         glm.vec3(uniform(-5, 2),
-        #                                                  uniform(-0.5, 0.5),
-        #                                                  uniform(-2, 5)))
-        # self.vehicle_base.model = glm.rotate(self.vehicle_base.model, 0.01, glm.vec3(0.0, 1.0, 0.0))
-        # self.vehicle_base.model = glm.rotate(self.vehicle_base.model, 0.007, glm.vec3(0.5, 0.5, 0.5))
         self.Refresh(False)
         event.Skip()
