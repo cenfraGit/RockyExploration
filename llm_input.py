@@ -42,6 +42,7 @@ class RobotControl:
         return response["message"]["content"].strip()
         
     def run(self) -> None:
+
         while True:
             instruction_human = input("instruction input:")
             instruction_robot = self.chat(instruction_human)
