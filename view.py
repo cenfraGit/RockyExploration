@@ -545,7 +545,7 @@ class VehicleArm:
         self.draw_vao(self.vao_p2, self.vertex_count_p2, model_p2, camera, light_directional, vehicle_base)
         # ----------- p3 ----------- # adapter
         model_p3 = model_p2
-        #model_p3 = glm.rotate(model_p3, sin(time.time()), glm.vec3(0.0, 1.0, 0.0))
+        model_p3 = glm.rotate(model_p3, sin(time.time()), glm.vec3(0.0, 1.0, 0.0))
         self.draw_vao(self.vao_p3, self.vertex_count_p3, model_p3, camera, light_directional, vehicle_base)
         # ----------- p4 ----------- # support
         model_p4 = model_p3
@@ -560,7 +560,7 @@ class VehicleArm:
         self.draw_vao(self.vao_p5, self.vertex_count_p5, model_p5, camera, light_directional, vehicle_base)
         # ----------- p6 ----------- # adapter
         model_p6 = model_p5
-        #model_p6 = glm.rotate(model_p6, sin(time.time()), glm.vec3(0.0, 1.0, 0.0))
+        model_p6 = glm.rotate(model_p6, sin(time.time()), glm.vec3(0.0, 1.0, 0.0))
         self.draw_vao(self.vao_p6, self.vertex_count_p6, model_p6, camera, light_directional, vehicle_base)
         # ----------- p7 ----------- #
         model_p7 = model_p6
@@ -572,6 +572,7 @@ class VehicleArm:
         model_p8 = model_p7
         model_p8 = glm.rotate(model_p8, glm.pi()/2, glm.vec3(0.0, 0.0, 1.0))
         model_p8 = glm.translate(model_p8, glm.vec3(180.0, 19.3, 0.0))
+        model_p8 = glm.rotate(model_p8, cos(time.time()) * 2, glm.vec3(0.0, 1.0, 0.0))
         self.draw_vao(self.vao_p8, self.vertex_count_p8, model_p8, camera, light_directional, vehicle_base)
         # ------------------ p9 ------------------ # motor
         model_p9 = model_p8
