@@ -2,13 +2,13 @@
 
 import wx
 import wx.aui as aui
-from utils import dip
-from camera import PanelCamera
-from view import PanelView
-from panelinfo import PanelInfo
-from statusbar import CustomStatusBar
-from mqtt_handler import MQTTHandler
-from vehiclestate import VehicleState
+from src.utils import dip
+from src.camera import PanelCamera
+from src.view import PanelView
+from src.panelinfo import PanelInfo
+from src.statusbar import CustomStatusBar
+from src.mqtt_handler import MQTTHandler
+from src.vehiclestate import VehicleState
 import json
 import datetime
 import cv2

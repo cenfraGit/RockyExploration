@@ -3,7 +3,7 @@ from faster_whisper import WhisperModel
 import io
 
 try:
-    model = WhisperModel("tiny.en", device="gpu", compute_type="int8")
+    model = WhisperModel("tiny.en", device="cpu", compute_type="int8")
     print("Model loaded.")
 except Exception as e:
     print(e)
@@ -25,7 +25,7 @@ with sr.Microphone() as source:
 
     while True:
         try:
-            
+
             print("Listening...")
 
             audio = r.listen(source, timeout=None, phrase_time_limit=2)
