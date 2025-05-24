@@ -1,7 +1,5 @@
 
-* TODO refactor
-
-* TODO menubar options for opening panels
+* DONE refactor
 
 * TODO add panel for speech recognition
 
@@ -10,5 +8,7 @@
 * TODO send llm output to topic
 
 * TODO write modelfile
+
+* TODO menubar options for opening panels
 
 * TODO new panel for arm processing with webcam
