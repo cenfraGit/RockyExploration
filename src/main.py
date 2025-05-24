@@ -30,6 +30,11 @@ class FrameMain(wx.Frame):
         self.SetTitle("Rocky Exploration UI - v1.0")
         self.SetClientSize(dip(800, 500))
 
+        # control modes:
+        # 0 -> manual
+        # 1 -> voice
+        # 2 -> imu hand
+        self.control_mode = 0
         self.connection_status = False
         self.vehicle_state = VehicleState()
 
@@ -82,14 +87,23 @@ class FrameMain(wx.Frame):
         menu_configuration = wx.Menu()
         item_connect = wx.MenuItem(menu_configuration, -1, "&Connect...", "Connect to a MQTT server.")
         item_disconnect = wx.MenuItem(menu_configuration, -1, "&Disconnect...", "Disconnect from the server.")
+        submenu_control = wx.Menu()
+        radio_control_manual = wx.MenuItem(submenu_control, wx.ID_ANY, "Manual", kind=wx.ITEM_RADIO)
+        radio_control_voice = wx.MenuItem(submenu_control, wx.ID_ANY, "Voice", kind=wx.ITEM_RADIO)
+        submenu_control.Append(radio_control_manual)
+        submenu_control.Append(radio_control_voice)
         item_exit = wx.MenuItem(menu_configuration, wx.ID_EXIT, "&Exit...\tAlt+F4", "Exit the application.")
         menu_configuration.Append(item_connect)
         menu_configuration.Append(item_disconnect)
+        menu_configuration.AppendSeparator()
+        menu_configuration.AppendSubMenu(submenu_control, "Control", "Change control mode.")
         menu_configuration.AppendSeparator()
         menu_configuration.Append(item_exit)
 
         self.Bind(wx.EVT_MENU, self.OnConnect, item_connect)
         self.Bind(wx.EVT_MENU, self.OnDisconnect, item_disconnect)
+        self.Bind(wx.EVT_MENU, self.OnControlManual, radio_control_manual)
+        self.Bind(wx.EVT_MENU, self.OnControlVoice, radio_control_voice)
         self.Bind(wx.EVT_MENU, self.OnExit, item_exit)
 
         # ----------------- view ----------------- #
@@ -148,6 +162,14 @@ class FrameMain(wx.Frame):
             self.connection_status = False
         else:
             wx.MessageDialog(self, "Server is offline.", "Disconnect failed.", style=wx.OK).ShowModal()
+
+    def OnControlManual(self, event):
+        print("manual")
+        self.control_mode = 0
+
+    def OnControlVoice(self, event):
+        print("voice")
+        self.control_mode = 1
 
     def OnExit(self, event):
         self.Close()
