@@ -1,1 +1,0 @@
-ollama create model-rocky -f ./modelfile
